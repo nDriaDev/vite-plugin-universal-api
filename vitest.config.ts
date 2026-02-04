@@ -13,6 +13,7 @@ export default defineConfig({
 				"src/index.ts",
 				"src/utils/utils.ts",
 				"src/utils/plugin.ts",
+				"src/utils/WebSocket.ts"
 			],
 			all: true,
 			reportsDirectory: 'coverage'

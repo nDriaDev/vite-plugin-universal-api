@@ -1,52 +1,70 @@
-import typescriptEslint from "@typescript-eslint/eslint-plugin";
-import globals from "globals";
-import tsParser from "@typescript-eslint/parser";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import js from "@eslint/js";
-import { FlatCompat } from "@eslint/eslintrc";
 import tseslint from "typescript-eslint";
+import globals from "globals";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const compat = new FlatCompat({
-    baseDirectory: __dirname,
-    recommendedConfig: js.configs.recommended,
-    allConfig: js.configs.all
-});
-
-export default [
-    ...compat.extends("eslint:recommended", "plugin:@typescript-eslint/recommended"),
-    ...tseslint.configs.recommended,
-    {
-        plugins: {
-            "@typescript-eslint": typescriptEslint
-        },
-        languageOptions: {
-            globals: {
-                ...globals.node,
-            },
-            parser: tsParser,
-            ecmaVersion: "latest",
-            sourceType: "module"
-        },
-        settings: {
-            "import/resolver": {
-                typescript: {},
-            },
-        },
-        rules: {
-            camelcase: "error",
-            "no-alert": "error",
-            "no-console": "off",
-            "no-duplicate-imports": "error",
-            "no-async-promise-executor": "off",
-            "@typescript-eslint/ban-ts-comment": "off",
-            "@typescript-eslint/no-empty-function": "off",
-            "@typescript-eslint/no-explicit-any": "off",
-            "@typescript-eslint/no-non-null-assertion": "off",
-            "@typescript-eslint/no-empty-interface": "off",
-            "@typescript-eslint/no-unused-expressions": "off"
-        },
-    },
-];
+export default tseslint.config(
+	{
+		ignores: [
+			"**/dist/**",
+			"**/node_modules/**",
+			"**/coverage/**",
+			"**/.vitepress/config.mts",
+			"**/.vitepress/dist/**",
+			"**/.vitepress/cache/**",
+			"**/docs/.vitepress/dist/**",
+			"**/docs/.vitepress/cache/**",
+			"**/*.config.js",
+			"**/*.config.ts",
+			"**/scripts/**/*.js",
+		]
+	},
+	js.configs.recommended,
+	...tseslint.configs.recommended,
+	{
+		languageOptions: {
+			ecmaVersion: 2022,
+			sourceType: "module",
+			globals: {
+				...globals.node,
+				...globals.es2021,
+			},
+			parserOptions: {
+				project: "./tsconfig.json",
+			}
+		},
+		rules: {
+			"no-console": "off",
+			"no-debugger": "warn",
+			"no-alert": "error",
+			"no-duplicate-imports": "error",
+			"no-unused-vars": "off",
+			"@typescript-eslint/no-unused-vars": [
+				"warn",
+				{
+					"argsIgnorePattern": "^_",
+					"varsIgnorePattern": "^_",
+					"caughtErrorsIgnorePattern": "^_"
+				}
+			],
+			"@typescript-eslint/no-explicit-any": "off",
+			"@typescript-eslint/no-non-null-assertion": "off",
+			"@typescript-eslint/ban-ts-comment": "off",
+			"@typescript-eslint/no-empty-function": "off",
+			"@typescript-eslint/no-empty-interface": "off",
+			"@typescript-eslint/no-unused-expressions": "off",
+			"@typescript-eslint/no-var-requires": "off",
+			"camelcase": ["warn", { "properties": "never" }],
+			"no-async-promise-executor": "off",
+			"no-case-declarations": "off",
+			"no-prototype-builtins": "off"
+		}
+	},
+	{
+		files: ["**/*.test.ts", "**/*.spec.ts"],
+		rules: {
+			"@typescript-eslint/no-explicit-any": "off",
+			"@typescript-eslint/no-unused-vars": "off",
+			"no-case-declarations": "off"
+		}
+	}
+);

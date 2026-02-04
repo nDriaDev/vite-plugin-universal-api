@@ -1,20 +1,23 @@
 {
-	"name": "@ndriadev/vite-plugin-rest-fs-api",
-	"description": "Plugin for a mock REST and File-based API integrated in Vite server.",
+	"name": "@ndriadev/vite-plugin-ws-rest-fs-api",
+	"description": "Plugin Mock WebSocket, REST and File-based APIs for Vite",
 	"private": false,
 	"version": "1.0.0",
 	"type": "module",
 	"files": [
-		"dist/"
+		"dist/",
+		"README.md",
+		"LICENSE",
+		"CHANGELOG.md"
 	],
 	"main": "./dist/index.cjs",
 	"module": "./dist/index.mjs",
 	"types": "./dist/index.d.ts",
 	"exports": {
 		".": {
+			"types": "./dist/index.d.ts",
 			"require": "./dist/index.cjs",
-			"import": "./dist/index.mjs",
-			"types": "./dist/index.d.ts"
+			"import": "./dist/index.mjs"
 		}
 	},
 	"scripts": {
@@ -22,25 +25,38 @@
 		"build": "unbuild",
 		"test": "vitest",
 		"test:coverage": "vitest --coverage",
+		"test:run": "vitest run",
 		"lint": "eslint .",
-		"docs": "typedoc --options typedoc.config.cjs && node scripts/copy-resources.js",
-		"release:patch": "pnpm version patch",
-		"release:minor": "pnpm version minor",
-		"release:major": "pnpm version major",
-		"postversion": "pnpm run docs && git add . && git commit -m '[FIX] docs' && git push && git push origin --tags && pnpm publish --access public",
-		"prepublishOnly": "pnpm run lint && pnpm run build"
+		"lint:fix": "eslint . --fix",
+		"typecheck": "tsc --noEmit",
+		"docs:dev": "vitepress dev docs",
+		"docs:build": "vitepress build docs",
+		"docs:preview": "vitepress preview docs",
+		"clean": "rimraf dist coverage docs/.vitepress/dist docs/.vitepress/cache",
+		"prebuild": "pnpm run clean",
+		"prepublishOnly": "pnpm run lint && pnpm run typecheck && pnpm run test:run && pnpm run build",
+		"changelog": "node scripts/generate-changelog.js",
+		"release:patch": "bash scripts/release.sh patch",
+		"release:minor": "bash scripts/release.sh minor",
+		"release:major": "bash scripts/release.sh major",
+		"postversion": "git push && git push --tags",
+		"version": "pnpm run changelog && git add CHANGELOG.md"
 	},
 	"engines": {
-		"node": "^18.0.0 || >=20.0.0"
+		"node": "^16.0.0 || ^18.0.0 || >=20.0.0"
 	},
 	"devDependencies": {
 		"@eslint/eslintrc": "^3.3.0",
 		"@eslint/js": "^9.21.0",
 		"@types/node": "^22.13.9",
+		"@vitest/coverage-v8": "3.2.4",
 		"eslint": "^9.21.0",
 		"globals": "^16.0.0",
+		"mkdirp": "^3.0.1",
+		"rimraf": "^6.1.2",
 		"typescript-eslint": "^8.26.0",
 		"unbuild": "^3.5.0",
+		"vitepress": "^1.5.0",
 		"vitest": "^3.2.4"
 	},
 	"peerDependencies": {
@@ -54,14 +70,18 @@
 		"server",
 		"api",
 		"mock-server",
+		"REST",
 		"rest",
+		"WS",
+		"ws",
+		"websocket",
 		"FS",
 		"file-system",
 		"file-based"
 	],
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/nDriaDev/vite-plugin-rest-fs-api"
+		"url": "git+https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api"
 	},
 	"author": {
 		"name": "Andrea Cosentino",
@@ -70,8 +90,8 @@
 	},
 	"readmeFilename": "README.md",
 	"bugs": {
-		"url": "https://github.com/nDriaDev/vite-plugin-rest-fs-api/issues"
+		"url": "https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/issues"
 	},
-	"homepage": "https://github.com/nDriaDev/vite-plugin-rest-fs-api",
+	"homepage": "https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api",
 	"license": "MIT"
 }

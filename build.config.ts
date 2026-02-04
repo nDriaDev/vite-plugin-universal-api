@@ -1,7 +1,7 @@
 import { defineBuildConfig } from 'unbuild';
 
 export default defineBuildConfig({
-    name: "vite-plugin-rest-fs-api",
+    name: "vite-plugin-ws-rest-fs-api",
     entries: ['src/index'],
     externals: ['vite'],
     clean: true,
@@ -9,7 +9,8 @@ export default defineBuildConfig({
     rollup: {
         emitCJS: true,
         inlineDependencies: true,
-        esbuild: {
+		esbuild: {
+			target: "node16",
             minify: true,
             minifyWhitespace: true,
             minifySyntax: true,
@@ -18,5 +19,15 @@ export default defineBuildConfig({
             ignoreAnnotations: true,
             legalComments: "none"
         }
-    },
+	},
+	hooks: {
+		'build:done': async (ctx) => {
+			console.log('✅ Build completed successfully!')
+			console.log('📦 Generated files:')
+			console.log('   - dist/index.cjs (CommonJS)')
+			console.log('   - dist/index.mjs (ESM)')
+			console.log('   - dist/index.d.ts (TypeScript declarations)')
+			console.log('   - dist/index.d.mts (ESM TypeScript declarations)')
+		}
+	}
 })
