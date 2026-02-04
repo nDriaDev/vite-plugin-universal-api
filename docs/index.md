@@ -13,11 +13,11 @@ hero:
       text: Get Started
       link: /guide/getting-started
     - theme: alt
-      text: View on GitHub
-      link: https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api
-    - theme: alt
       text: API Reference
       link: /api/
+    - theme: alt
+      text: View on GitHub
+      link: https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api
 
 features:
   - icon: 📁
@@ -56,61 +56,6 @@ features:
     title: Zero Dependencies
     details: Minimal footprint with no runtime dependencies. Works with Node 16+, Vite 4+.
 ---
-
-## Quick Example
-
-```typescript
-// vite.config.ts
-import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-ws-rest-fs-api'
-
-export default defineConfig({
-  plugins: [
-    mockApi({
-      endpointPrefix: '/api',
-      fsDir: 'mock',
-      enableWs: true,
-      handlers: [
-        {
-          pattern: '/users/{id}',
-          method: 'GET',
-          handle: async (req, res) => {
-            const user = await db.findUser(req.params.id)
-            res.writeHead(200, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify(user))
-          }
-        }
-      ],
-      wsHandlers: [
-        {
-          pattern: '/ws/chat',
-          onMessage: (conn, msg) => {
-            conn.broadcast(msg, { includeSelf: true })
-          }
-        }
-      ]
-    })
-  ]
-})
-```
-
-## Installation
-
-::: code-group
-
-```bash [pnpm]
-pnpm add -D @ndriadev/vite-plugin-ws-rest-fs-api
-```
-
-```bash [npm]
-npm install -D @ndriadev/vite-plugin-ws-rest-fs-api
-```
-
-```bash [yarn]
-yarn add -D @ndriadev/vite-plugin-ws-rest-fs-api
-```
-
-:::
 
 ## Why This Plugin?
 
