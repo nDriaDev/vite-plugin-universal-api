@@ -1,13 +1,13 @@
 import { Connect, Plugin } from "vite";
-import { ApiRestFsMockOptions, ApiRestFsMockOptionsRequired } from "./models/index.model";
+import { ApiWsRestFsOptions, ApiWsRestFsOptionsRequired } from "./models/index.model";
 import { Logger } from "./utils/Logger";
 import { Constants } from "./utils/constants";
 import { Utils } from "./utils/utils";
 import { IncomingMessage, ServerResponse } from "node:http";
-import { runPlugin } from "./utils/plugin";
+import { runPlugin, runWsPlugin } from "./utils/plugin";
 
-function plugin(opts?: ApiRestFsMockOptions): Plugin {
-	let options: ApiRestFsMockOptionsRequired,
+function plugin(opts?: ApiWsRestFsOptions): Plugin {
+	let options: ApiWsRestFsOptionsRequired,
 		logger: Logger;
 	return {
 		name: Constants.PLUGIN_NAME,
@@ -22,7 +22,7 @@ function plugin(opts?: ApiRestFsMockOptions): Plugin {
 				logger.info(`Directory with path ${options.fsDir} doesn't exist.`);
 			}
 			if (options.endpointPrefix.length === 0) {
-				logger.warn(`Endpoint prefix empty or invalid.`);
+				logger.warn(`Endpoint prefix empty or invalid`);
 				options.disable = true;
 			}
 
@@ -35,8 +35,9 @@ function plugin(opts?: ApiRestFsMockOptions): Plugin {
 			}
 			logger.debug("Vite configureServer: START", `options= ${JSON.stringify({ ...options, config: "", matcher: "" }, null, 2)}`);
 			server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => {
-				runPlugin(req, res, next, logger, options);
+				await runPlugin(req, res, next, logger, options);
 			})
+			runWsPlugin(server, logger, options);
 			logger.debug("Vite configureServer: FINISH");
 		},
 		configurePreviewServer(server) {
@@ -45,8 +46,9 @@ function plugin(opts?: ApiRestFsMockOptions): Plugin {
 			}
 			logger.debug("Vite configurePreviewServer: START", `options= ${JSON.stringify({ ...options, config: "", matcher: "" }, null, 2)}`);
 			server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => {
-				runPlugin(req, res, next, logger, options);
+				await runPlugin(req, res, next, logger, options);
 			})
+			runWsPlugin(server, logger, options);
 			logger.debug("Vite configurePreviewServer: FINISH");
 		}
 	}

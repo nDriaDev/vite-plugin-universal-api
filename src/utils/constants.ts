@@ -1,6 +1,7 @@
 export const Constants = {
-	PLUGIN_NAME: "vite-plugin-rest-fs-api",
+	PLUGIN_NAME: "vite-plugin-ws-rest-fs-api",
     TOTAL_ELEMENTS_HEADER: "X-Total-Count",
+    DELETED_ELEMENTS_HEADER: "X-Deleted-Count",
     HTTP_STATUS_CODE: {
         OK: 200,
         CREATED: 201,
@@ -10,7 +11,13 @@ export const Constants = {
         NOT_FOUND: 404,
         METHOD_NOT_ALLOWED: 405,
         CONFLICT: 409,
+		UNSUPPORTED_MEDIA_TYPE: 415,
+		UNPROCESSABLE_ENTITY: 422,
 		INTERNAL_SERVER_ERROR: 500,
 		GATEWAY_TIMEOUT: 504
-    }
+	},
+	WEB_SOCKET: {
+		HANDSHAKE_MAGIC_STRING: "258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
+		PER_MESSAGE_DEFLATE_STRICT_ERROR: "perMessageDeflate strict"
+	}
 }
