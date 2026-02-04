@@ -22,7 +22,6 @@
 	},
 	"scripts": {
 		"dev": "unbuild --stub",
-		"build": "unbuild",
 		"test": "vitest",
 		"test:coverage": "vitest --coverage",
 		"test:run": "vitest run",
@@ -34,6 +33,8 @@
 		"docs:preview": "vitepress preview docs",
 		"clean": "rimraf dist coverage docs/.vitepress/dist docs/.vitepress/cache",
 		"prebuild": "pnpm run clean",
+		"build": "unbuild",
+		"postbuild": "node scripts/verify-build.js",
 		"prepublishOnly": "pnpm run lint && pnpm run typecheck && pnpm run test:run && pnpm run build",
 		"changelog": "node scripts/generate-changelog.js",
 		"release:patch": "bash scripts/release.sh patch",
