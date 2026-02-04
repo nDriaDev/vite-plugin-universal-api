@@ -12,7 +12,7 @@ const __dirname = dirname(__filename);
 export default defineConfig({
 	title: "vite-plugin-ws-rest-fs-api",
 	description: "Mock WebSocket, REST and File-based APIs for Vite",
-	base: "/vite-plugin-ws-rest-fs-api/",
+	base: "/",
 	buildEnd() {
 		const sitemapPath = resolve(join(__dirname, "dist", "sitemap.xml"));
 		const humansPath = resolve(join(__dirname, "dist", "humans.txt"));
