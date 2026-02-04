@@ -55,23 +55,4 @@ features:
   - icon: 🚀
     title: Zero Dependencies
     details: Minimal footprint with no runtime dependencies. Works with Node 16+, Vite 4+.
----
 
-## Why This Plugin?
-
-Building modern web applications often requires mocking backend APIs during development. This plugin provides three complementary approaches:
-
-- **📁 File-System API** - Perfect for static mock data, quick prototyping, and testing
-- **🔄 REST Handlers** - Full control for complex logic, validation, and dynamic responses
-- **⚡ WebSocket** - Real-time features like chat, notifications, and live updates
-
-All integrated seamlessly into your Vite development server, with hot reload and zero configuration required.
-
-## Community
-
-- [GitHub Discussions](https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/discussions)
-- [GitHub Issues](https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/issues)
-
-## License
-
-[MIT](https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/blob/main/LICENSE) © [nDriaDev](https://github.com/nDriaDev)

@@ -50,7 +50,8 @@ export default defineConfig({
 					text: 'Introduction',
 					items: [
 						{ text: 'Getting Started', link: '/guide/getting-started' },
-						{ text: 'Quick Start', link: '/guide/quick-start' }
+						{ text: 'Quick Start', link: '/guide/quick-start' },
+						{ text: 'Troubleshooting', link: '/guide/troubleshooting' },
 					]
 				},
 				{
@@ -111,10 +112,6 @@ export default defineConfig({
 		},
 		search: {
 			provider: 'local'
-		},
-		editLink: {
-			pattern: 'https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/edit/main/docs/:path',
-			text: 'Edit this page on GitHub'
 		}
 	},
 	head: [
