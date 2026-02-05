@@ -6,7 +6,7 @@ Multiplayer game server with rooms and state management.
 
 ```typescript
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import mockApi from '@ndriadev/vite-plugin-universal-api'
 
 const games = new Map()
 
@@ -19,7 +19,7 @@ export default defineConfig({
           pattern: '/ws/game',
           heartbeat: 10000,
           compression: { enabled: true },
-          
+
           onMessage: (conn, data) => {
             switch (data.type) {
               case 'create-game':
@@ -28,7 +28,7 @@ export default defineConfig({
                 conn.joinRoom(gameId)
                 conn.send({ type: 'game-created', gameId })
                 break
-                
+
               case 'join-game':
                 if (games.has(data.gameId)) {
                   games.get(data.gameId).players.push(conn.id)
@@ -39,7 +39,7 @@ export default defineConfig({
                   }, { rooms: [data.gameId] })
                 }
                 break
-                
+
               case 'game-action':
                 conn.broadcast({
                   type: 'game-update',

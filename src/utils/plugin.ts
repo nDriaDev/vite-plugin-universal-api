@@ -1,12 +1,12 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Connect, PreviewServer, ViteDevServer } from "vite";
-import { ApiWsRestFsDataResponse, ApiRestFsHandler, ApiWsRestFsOptionsRequired, ApiWsRestFsRequest, HandledRequestData, ApiWsHandler } from "src/models/index.model";
+import { ApiWsRestFsDataResponse, UniversalApiRestFsHandler, UniversalApiOptionsRequired, UniversalApiRequest, HandledRequestData, UniversalApiWsHandler } from "src/models/index.model";
 import { Utils } from "./utils";
 import { join, parse } from "node:path";
 import { MimeType } from "./MimeType";
 import { Constants } from "./constants";
 import { AntPathMatcher } from "./AntPathMatcher";
-import { ApiWsRestFsError } from "./Error";
+import { UniversalApiError } from "./Error";
 import { Socket } from "node:net";
 import { ConnectionManager, WebSocketConnection, WebSocketFrameParser } from "./WebSocket";
 import { ILogger } from "src/models/logger.model";
@@ -18,7 +18,7 @@ import { IWebSocketConnection, WebSocketFrame } from "src/models/webSocket.model
  * Not used for now. It simulates the options http request behavior
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-function handlingOptionsRequest(logger: ILogger, matcher: AntPathMatcher, fullUrl: URL, request: ApiWsRestFsRequest, handlers: ApiRestFsHandler[], endpointNoPrefix: string, result: HandledRequestData): boolean {
+function handlingOptionsRequest(logger: ILogger, matcher: AntPathMatcher, fullUrl: URL, request: UniversalApiRequest, handlers: UniversalApiRestFsHandler[], endpointNoPrefix: string, result: HandledRequestData): boolean {
 	logger.debug("handlingOptionsRequest: START");
 	try {
 		if (request.method !== "OPTIONS") {
@@ -56,14 +56,14 @@ function handlingOptionsRequest(logger: ILogger, matcher: AntPathMatcher, fullUr
 			}
 			return true;
 		}
-		throw new ApiWsRestFsError("Request with OPTIONS method doesn't match endpointPrefix", "NO_HANDLER", fullUrl.pathname);
+		throw new UniversalApiError("Request with OPTIONS method doesn't match endpointPrefix", "NO_HANDLER", fullUrl.pathname);
 	} finally {
 		logger.debug("handlingOptionsRequest: END");
 	}
 }
 /* v8 ignore stop */
 
-async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiWsRestFsRequest, res: ServerResponse, paginationPlugin: ApiWsRestFsOptionsRequired["pagination"], filtersPlugin: ApiWsRestFsOptionsRequired["filters"], parser: ApiWsRestFsOptionsRequired["parser"], handler: ApiRestFsHandler | null, endpointPrefix: string[], fullFsDir: string | null, result: HandledRequestData): Promise<boolean> {
+async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: UniversalApiRequest, res: ServerResponse, paginationPlugin: UniversalApiOptionsRequired["pagination"], filtersPlugin: UniversalApiOptionsRequired["filters"], parser: UniversalApiOptionsRequired["parser"], handler: UniversalApiRestFsHandler | null, endpointPrefix: string[], fullFsDir: string | null, result: HandledRequestData): Promise<boolean> {
 	logger.debug("handlingApiFsRequest: START");
 	try {
 		const IS_API_REST_FS = handler !== null && handler.handle === "FS",
@@ -72,7 +72,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 			postHandleHandler = handler !== null ? handler.postHandle : undefined;
 		if (fullFsDir === null) {
 			if (IS_API_REST_FS) {
-				throw new ApiWsRestFsError("Request matching Api Rest Fs handler but fsDir provide doesn't exists", "ERROR", fullUrl.pathname);
+				throw new UniversalApiError("Request matching Api Rest Fs handler but fsDir provide doesn't exists", "ERROR", fullUrl.pathname);
 			} else {
 				return false;
 			}
@@ -140,7 +140,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 				dataFile.total = 1;
 			} catch (error: any) {
 				logger.error("handlingApiFsRequest: Error reading file ", file, error);
-				throw new ApiWsRestFsError(`Error reading file ${file}`, "ERROR", fullUrl.pathname);
+				throw new UniversalApiError(`Error reading file ${file}`, "ERROR", fullUrl.pathname);
 			}
 		}
 		dataFile.originalData = dataFile.data;
@@ -156,7 +156,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 						: dataFile.originalData
 					: null
 			);
-			throw new ApiWsRestFsError("FS REST", "MANUALLY_HANDLED", fullUrl.pathname);
+			throw new UniversalApiError("FS REST", "MANUALLY_HANDLED", fullUrl.pathname);
 		}
 
 		logger.debug("handlingApiFsRequest: request Method: ", request.method!);
@@ -177,13 +177,13 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 								await Utils.request.parseRequest(request, res, fullUrl, parser, logger);
 							}
 							if (request.body !== null || request.files !== null) {
-								throw new ApiWsRestFsError(`${request.method} request cannot have a body in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+								throw new UniversalApiError(`${request.method} request cannot have a body in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 							}
 							try {
 								logger.debug("handlingApiFsRequest: applying pagination and filters");
 								Utils.request.applyPaginationAndFilters(request, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin, dataFile);
 							} catch (error: any) {
-								if (error instanceof ApiWsRestFsError) {
+								if (error instanceof UniversalApiError) {
 									if (error.getType() === "MANUALLY_HANDLED") {
 										error.setType("ERROR");
 										error.setPath(fullUrl.pathname);
@@ -191,7 +191,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 									throw error;
 								}
 								logger.debug("handlingApiFsRequest: ERROR parsing json content file ", file!, error);
-								throw new ApiWsRestFsError(`Error parsing json content file ${file}`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+								throw new UniversalApiError(`Error parsing json content file ${file}`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 							}
 						}
 						request.method === "GET" && (result.data = dataFile.data);
@@ -206,7 +206,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 							{ name: Constants.TOTAL_ELEMENTS_HEADER, value: dataFile.total }
 						);
 					} else {
-						throw new ApiWsRestFsError(
+						throw new UniversalApiError(
 							file,
 							"READ_FILE",
 							fullUrl.pathname,
@@ -218,7 +218,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 						);
 					}
 				} else {
-					throw new ApiWsRestFsError("Not found", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.NOT_FOUND);
+					throw new UniversalApiError("Not found", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.NOT_FOUND);
 				}
 				break;
 			case "POST":
@@ -228,7 +228,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 						await Utils.request.parseRequest(request, res, fullUrl, parser, logger);
 					}
 					if (request.files !== null && request.files.length > 1) {
-						throw new ApiWsRestFsError(`POST request with multiple file is not allowed in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+						throw new UniversalApiError(`POST request with multiple file is not allowed in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 					}
 					const HAS_BODY = request.body !== null;
 					const HAS_FILE = request.files !== null && request.files.length > 0;
@@ -244,12 +244,12 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 					const IS_JSON_FILE = dataFile.mimeType === MimeType[".json"];
 
 					if (HAS_BODY && HAS_FILE) {
-						throw new ApiWsRestFsError(`POST request with file and body is not allowed in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+						throw new UniversalApiError(`POST request with file and body is not allowed in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 					}
 					let writeFile = -1;
 					if (fileFound) {
 						if (!IS_JSON_FILE) {
-							throw new ApiWsRestFsError(`POST request for not json file is not allowed in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+							throw new UniversalApiError(`POST request for not json file is not allowed in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 						}
 						result.status = Constants.HTTP_STATUS_CODE.OK;
 						if (HAS_PAG_OR_FILT) {
@@ -257,7 +257,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 								logger.debug("handlingApiFsRequest: applying pagination and filters");
 								Utils.request.applyPaginationAndFilters(request, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin, dataFile);
 							} catch (error: any) {
-								if (error instanceof ApiWsRestFsError) {
+								if (error instanceof UniversalApiError) {
 									if (error.getType() === "MANUALLY_HANDLED") {
 										error.setType("ERROR");
 										error.setPath(fullUrl.pathname);
@@ -265,16 +265,16 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 									throw error;
 								}
 								logger.debug("handlingApiFsRequest: ERROR parsing json content file", file!, error);
-								throw new ApiWsRestFsError(`Error to retrive filtered and paginated data from ${file}`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+								throw new UniversalApiError(`Error to retrive filtered and paginated data from ${file}`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 							}
 						}
 						if (HAS_DATA) {
 							if (!IS_JSON_CONTENT || !HAS_PAG_OR_FILT) {
-								throw new ApiWsRestFsError(`File at ${fullUrl.pathname} already exists`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.CONFLICT);
+								throw new UniversalApiError(`File at ${fullUrl.pathname} already exists`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.CONFLICT);
 							}
 							const bodyClean = Utils.request.getCleanBody(request.method, currentContent, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin);
 							if (bodyClean !== null) {
-								throw new ApiWsRestFsError(`File at ${fullUrl.pathname} already exists`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.CONFLICT);
+								throw new UniversalApiError(`File at ${fullUrl.pathname} already exists`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.CONFLICT);
 							}
 						}
 						result.data = dataFile.data;
@@ -291,10 +291,10 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 						);
 					} else {
 						if (!HAS_DATA) {
-							throw new ApiWsRestFsError(`No data provided`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+							throw new UniversalApiError(`No data provided`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 						}
 						if (HAS_PAG_OR_FILT) {
-							throw new ApiWsRestFsError(`No data to filter or to paginate`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+							throw new UniversalApiError(`No data to filter or to paginate`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 						}
 						result.status = Constants.HTTP_STATUS_CODE.CREATED;
 						writeFile = currentContent;
@@ -304,15 +304,15 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 							await Utils.files.writingFile(file, fileFound, writeFile, currentMime, true);
 						} catch (error: any) {
 							logger.error("handlingApiFsRequest: Error writing file with POST method", error);
-							throw new ApiWsRestFsError("Error writing data", "ERROR", fullUrl.pathname);
+							throw new UniversalApiError("Error writing data", "ERROR", fullUrl.pathname);
 						}
 					}
 				} catch (error: any) {
-					if (error instanceof ApiWsRestFsError) {
+					if (error instanceof UniversalApiError) {
 						throw error;
 					}
 					logger.error("handlingApiFsRequest: Error detecting data to write with POST method", error);
-					throw new ApiWsRestFsError("Error creating data", "ERROR", fullUrl.pathname);
+					throw new UniversalApiError("Error creating data", "ERROR", fullUrl.pathname);
 				}
 				break;
 			case "PUT":
@@ -321,7 +321,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 					await Utils.request.parseRequest(request, res, fullUrl, parser, logger);
 				}
 				if (request.files !== null && request.files.length > 1) {
-					throw new ApiWsRestFsError(`PUT request with multiple file is not allowed in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+					throw new UniversalApiError(`PUT request with multiple file is not allowed in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 				}
 				result.status = Constants.HTTP_STATUS_CODE[fileFound ? "OK" : "CREATED"];
 				let writeFile, mimeType;
@@ -334,28 +334,28 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 					writeFile = request.files[0].content;
 					mimeType = request.files[0].contentType as MimeType;
 				} else {
-					throw new ApiWsRestFsError("No data provided", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+					throw new UniversalApiError("No data provided", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 				}
 				try {
 					await Utils.files.writingFile(file, fileFound, writeFile, mimeType as MimeType, true);
 				} catch (error: any) {
 					logger.error(`handlingApiFsRequest: Error ${fileFound ? "updating" : "creating"} file with PUT method`, error);
-					throw new ApiWsRestFsError(`Error ${fileFound ? "updating" : "creating"} data`, "ERROR", fullUrl.pathname);
+					throw new UniversalApiError(`Error ${fileFound ? "updating" : "creating"} data`, "ERROR", fullUrl.pathname);
 				}
 				break;
 			case "PATCH":
 				if (!["application/json", "application/json-patch+json", "application/merge-patch+json"].includes(request.headers["content-type"] || "")) {
-					throw new ApiWsRestFsError(`PATCH request content-type unsupported in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.UNSUPPORTED_MEDIA_TYPE);
+					throw new UniversalApiError(`PATCH request content-type unsupported in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.UNSUPPORTED_MEDIA_TYPE);
 				}
 				if (!IS_API_REST_FS) {
 					logger.debug("handlingApiFsRequest: parsing request");
 					await Utils.request.parseRequest(request, res, fullUrl, parser, logger);
 				}
 				if (!fileFound) {
-					throw new ApiWsRestFsError("Resource to update not found", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.NOT_FOUND);
+					throw new UniversalApiError("Resource to update not found", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.NOT_FOUND);
 				}
 				if (dataFile.mimeType !== MimeType[".json"]) {
-					throw new ApiWsRestFsError(`Only json file can be processing with PATCH http method`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+					throw new UniversalApiError(`Only json file can be processing with PATCH http method`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 				}
 				result.status = Constants.HTTP_STATUS_CODE.OK;
 				try {
@@ -363,7 +363,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 					const newData = Utils.files.applyingPatch(JSON.parse(dataFile.data), request.body, TYPE_PATCH);
 					await Utils.files.writingFile(file, fileFound, newData, dataFile.mimeType, true);
 				} catch (error: any) {
-					if (error instanceof ApiWsRestFsError) {
+					if (error instanceof UniversalApiError) {
 						if (error.getType() === "MANUALLY_HANDLED") {
 							error.setType("ERROR");
 							error.setPath(fullUrl.pathname);
@@ -371,21 +371,21 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 						throw error;
 					}
 					logger.error(`handlingApiFsRequest: Error partial updating resource with PATCH method`, error);
-					throw new ApiWsRestFsError("Error partial updating resource", "ERROR", fullUrl.pathname);
+					throw new UniversalApiError("Error partial updating resource", "ERROR", fullUrl.pathname);
 				}
 				break;
 			case "OPTIONS":
-				throw new ApiWsRestFsError(`Method OPTIONS not allowed in File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.METHOD_NOT_ALLOWED);
+				throw new UniversalApiError(`Method OPTIONS not allowed in File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.METHOD_NOT_ALLOWED);
 			case "DELETE":
 				if (!fileFound) {
-					throw new ApiWsRestFsError("Resource to delete not found", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.NOT_FOUND);
+					throw new UniversalApiError("Resource to delete not found", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.NOT_FOUND);
 				}
 				if (!IS_API_REST_FS) {
 					logger.debug("handlingApiFsRequest: parsing request");
 					await Utils.request.parseRequest(request, res, fullUrl, parser, logger);
 				}
 				if (request.body !== null || request.files !== null) {
-					throw new ApiWsRestFsError(`DELETE request cannot have a body in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+					throw new UniversalApiError(`DELETE request cannot have a body in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 				}
 				result.status = Constants.HTTP_STATUS_CODE.NO_CONTENT;
 				try {
@@ -395,10 +395,10 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 							logger.debug("handlingApiFsRequest: applying pagination and filters");
 							Utils.request.applyPaginationAndFilters(request, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin, dataFile);
 							if (!dataFile.data || Array.isArray(dataFile.data) && dataFile.data.length === 0) {
-								throw new ApiWsRestFsError("Partial resource to delete not found", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.NOT_FOUND);
+								throw new UniversalApiError("Partial resource to delete not found", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.NOT_FOUND);
 							}
 						} catch (error: any) {
-							if (error instanceof ApiWsRestFsError) {
+							if (error instanceof UniversalApiError) {
 								if (error.getType() === "MANUALLY_HANDLED") {
 									error.setType("ERROR");
 									error.setPath(fullUrl.pathname);
@@ -406,7 +406,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 								throw error;
 							}
 							logger.debug("handlingApiFsRequest: ERROR parsing json content file ", file!, error);
-							throw new ApiWsRestFsError(`Error parsing json content file ${file}`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+							throw new UniversalApiError(`Error parsing json content file ${file}`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 						}
 						let newData: any[] | Record<string, any>;
 						if (Array.isArray(dataFile.originalData)) {
@@ -432,10 +432,10 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 						result.headers.push({name: Constants.DELETED_ELEMENTS_HEADER, value: 1});
 					}
 				} catch (error) {
-					if (error instanceof ApiWsRestFsError) {
+					if (error instanceof UniversalApiError) {
 						throw error;
 					}
-					throw new ApiWsRestFsError("Error deleting resource", "ERROR", fullUrl.pathname);
+					throw new UniversalApiError("Error deleting resource", "ERROR", fullUrl.pathname);
 				}
 				break;
 			default:
@@ -443,17 +443,17 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: ApiW
 		}
 		return true;
 	} catch (error: any) {
-		if (error instanceof ApiWsRestFsError) {
+		if (error instanceof UniversalApiError) {
 			throw error;
 		}
 		logger.debug("handlingApiFsRequest: ERROR - ", error);
-		throw new ApiWsRestFsError(error, "ERROR", fullUrl.pathname);
+		throw new UniversalApiError(error, "ERROR", fullUrl.pathname);
 	} finally {
 		logger.debug("handlingApiFsRequest: END");
 	}
 }
 
-async function handlingApiRestRequest(logger: ILogger, matcher: AntPathMatcher, fullUrl: URL, request: ApiWsRestFsRequest, res: ServerResponse, handlers: ApiWsRestFsOptionsRequired["handlers"], middlewares: ApiWsRestFsOptionsRequired["middlewares"], errorMiddlewares: ApiWsRestFsOptionsRequired["errorMiddlewares"], delay: ApiWsRestFsOptionsRequired["delay"], pagination: ApiWsRestFsOptionsRequired["pagination"], filters: ApiWsRestFsOptionsRequired["filters"], parser: ApiWsRestFsOptionsRequired["parser"], endpointPrefix: string[], endpointNoPrefix: string, fullFsDir: string | null, result: HandledRequestData): Promise<boolean> {
+async function handlingApiRestRequest(logger: ILogger, matcher: AntPathMatcher, fullUrl: URL, request: UniversalApiRequest, res: ServerResponse, handlers: UniversalApiOptionsRequired["handlers"], middlewares: UniversalApiOptionsRequired["middlewares"], errorMiddlewares: UniversalApiOptionsRequired["errorMiddlewares"], delay: UniversalApiOptionsRequired["delay"], pagination: UniversalApiOptionsRequired["pagination"], filters: UniversalApiOptionsRequired["filters"], parser: UniversalApiOptionsRequired["parser"], endpointPrefix: string[], endpointNoPrefix: string, fullFsDir: string | null, result: HandledRequestData): Promise<boolean> {
 	logger.debug("handlingApiRestRequest: START");
 	try {
 		let handler: typeof handlers[number] | null = null;
@@ -499,32 +499,32 @@ async function handlingApiRestRequest(logger: ILogger, matcher: AntPathMatcher, 
 				}
 				logger.debug("handlingApiRestRequest: API REST handler");
 				await handler.handle(request, res);
-				throw new ApiWsRestFsError("REST", "MANUALLY_HANDLED", fullUrl.pathname);
+				throw new UniversalApiError("REST", "MANUALLY_HANDLED", fullUrl.pathname);
 			} catch (error: any) {
-				if (error instanceof ApiWsRestFsError) {
+				if (error instanceof UniversalApiError) {
 					throw error;
 				}
 				logger.debug("handlingApiRestRequest: ERROR applying middleware chain ", error);
-				throw new ApiWsRestFsError(error as Error, "ERROR", fullUrl.pathname);
+				throw new UniversalApiError(error as Error, "ERROR", fullUrl.pathname);
 			}
 		}
 		return false;
 	} catch (error: any) {
-		if (error instanceof ApiWsRestFsError) {
+		if (error instanceof UniversalApiError) {
 			throw error;
 		}
 		logger.debug("handlingApiRestRequest: ERROR - ", error);
-		throw new ApiWsRestFsError(error, "ERROR", fullUrl.pathname);
+		throw new UniversalApiError(error, "ERROR", fullUrl.pathname);
 	} finally {
 		logger.debug("handlingApiRestRequest: END");
 	}
 }
 
-const runPluginInternal = async (req: IncomingMessage, res: ServerResponse, logger: ILogger, options: ApiWsRestFsOptionsRequired) => {
+const runPluginInternal = async (req: IncomingMessage, res: ServerResponse, logger: ILogger, options: UniversalApiOptionsRequired) => {
 	const { config, endpointPrefix, handlers, matcher, middlewares, errorMiddlewares, delay, fullFsDir, filters, pagination, parser } = options;
 	const fullUrl = Utils.request.buildFullUrl(req, config);
 	const endpointNoPrefix = Utils.request.removeEndpointPrefix(fullUrl.pathname, endpointPrefix);
-	let requ: ApiWsRestFsRequest = req as ApiWsRestFsRequest;
+	let requ: UniversalApiRequest = req as UniversalApiRequest;
 	try {
 		logger.debug(`runPluginInternal: START request url = ${req.url}`);
 
@@ -536,7 +536,7 @@ const runPluginInternal = async (req: IncomingMessage, res: ServerResponse, logg
 
 		if (!Utils.request.matchesEndpointPrefix(req.url, endpointPrefix)) {
 			logger.info(`runPluginInternal: Request with url ${req.url} doesn't match endpointPrefix option.`);
-			throw new ApiWsRestFsError("Request doesn't match endpointPrefix", "NO_HANDLER", fullUrl.pathname);
+			throw new UniversalApiError("Request doesn't match endpointPrefix", "NO_HANDLER", fullUrl.pathname);
 		}
 		const request = Utils.request.createRequest(req);
 		requ = request;
@@ -553,19 +553,19 @@ const runPluginInternal = async (req: IncomingMessage, res: ServerResponse, logg
 			return result;
 		}
 
-		throw new ApiWsRestFsError(`Impossible handling request with url ${fullUrl}`, "NO_HANDLER", fullUrl.pathname);
+		throw new UniversalApiError(`Impossible handling request with url ${fullUrl}`, "NO_HANDLER", fullUrl.pathname);
 	} catch (error: any) {
-		if (error instanceof ApiWsRestFsError) {
+		if (error instanceof UniversalApiError) {
 			throw error;
 		}
 		logger.error("runPluginInternal: ERROR - ", error);
-		throw new ApiWsRestFsError(error, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR, { requ });
+		throw new UniversalApiError(error, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR, { requ });
 	} finally {
 		logger.debug(`runPluginInternal: FINISH`);
 	}
 }
 
-async function handleControlFrame(frame: WebSocketFrame, connection: IWebSocketConnection, handler: ApiWsHandler, logger: ILogger) {
+async function handleControlFrame(frame: WebSocketFrame, connection: IWebSocketConnection, handler: UniversalApiWsHandler, logger: ILogger) {
 	logger.debug(`handleControlFrame: START`);
 	let result = false;
 	// INFO CLOSE FRAME
@@ -659,7 +659,7 @@ async function handleControlFrame(frame: WebSocketFrame, connection: IWebSocketC
 	return result;
 }
 
-async function validateFrame(frame: WebSocketFrame, connection: IWebSocketConnection, handler: ApiWsHandler, logger: ILogger) {
+async function validateFrame(frame: WebSocketFrame, connection: IWebSocketConnection, handler: UniversalApiWsHandler, logger: ILogger) {
 	logger.debug(`validateFrame START`);
 	let result = true;
 	let reason = "";
@@ -693,7 +693,7 @@ async function validateFrame(frame: WebSocketFrame, connection: IWebSocketConnec
 	return result;
 }
 
-async function handleResponsesMatching(connection: IWebSocketConnection, handler: ApiWsHandler, message: any, logger: ILogger) {
+async function handleResponsesMatching(connection: IWebSocketConnection, handler: UniversalApiWsHandler, message: any, logger: ILogger) {
 	logger.debug(`handleResponsesMatching: START`);
 	let result = false;
 	if (handler.responses && handler.responses.length > 0) {
@@ -760,7 +760,7 @@ async function handleResponsesMatching(connection: IWebSocketConnection, handler
 	return result;
 }
 
-async function handleDataFrame(frame: WebSocketFrame, connection: IWebSocketConnection, handler: ApiWsHandler, logger: ILogger) {
+async function handleDataFrame(frame: WebSocketFrame, connection: IWebSocketConnection, handler: UniversalApiWsHandler, logger: ILogger) {
 	logger.debug(`handleDataFrame START`);
 	try {
 		const result = connection.accumulateFragment(frame);
@@ -840,7 +840,7 @@ async function handleDataFrame(frame: WebSocketFrame, connection: IWebSocketConn
 	}
 }
 
-async function processFrame(frame: WebSocketFrame, connection: IWebSocketConnection, handler: ApiWsHandler, logger: ILogger) {
+async function processFrame(frame: WebSocketFrame, connection: IWebSocketConnection, handler: UniversalApiWsHandler, logger: ILogger) {
 	logger.debug(`processFrame: START`);
 	try {
 		const handled = await handleControlFrame(frame, connection, handler, logger);
@@ -870,10 +870,10 @@ async function processFrame(frame: WebSocketFrame, connection: IWebSocketConnect
 	}
 }
 
-function handlingApiWsRequest(logger: ILogger, options: ApiWsRestFsOptionsRequired) {
+function handlingApiWsRequest(logger: ILogger, options: UniversalApiOptionsRequired) {
 	logger.debug(`handlingApiWsRequest: START`);
 	const { endpointPrefix, wsHandlers, matcher } = options;
-	const managers = new Map<ApiWsHandler, ConnectionManager>();
+	const managers = new Map<UniversalApiWsHandler, ConnectionManager>();
 	logger.debug(`handlingApiWsRequest: initialize connection managers for enabled handlers`);
 	wsHandlers.forEach(handler => {
 		if (!handler.disabled) {
@@ -1056,7 +1056,7 @@ function handlingApiWsRequest(logger: ILogger, options: ApiWsRestFsOptionsRequir
 	}
 }
 
-export const runPlugin = async (req: IncomingMessage, response: ServerResponse, next: Connect.NextFunction, logger: ILogger, options: ApiWsRestFsOptionsRequired) => {
+export const runPlugin = async (req: IncomingMessage, response: ServerResponse, next: Connect.NextFunction, logger: ILogger, options: UniversalApiOptionsRequired) => {
 	logger.debug(`runPlugin: START`);
 	try {
 		const { gatewayTimeout, errorMiddlewares, noHandledRestFsRequestsAction: noHandledRequestsAction } = options;
@@ -1089,7 +1089,7 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 					headers
 				});
 			})
-			.catch(async (error: ApiWsRestFsError) => {
+			.catch(async (error: UniversalApiError) => {
 				clearTimeout(gatewayIdTimeout);
 				const dataResponse: ApiWsRestFsDataResponse = {
 					status: Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR,
@@ -1156,7 +1156,7 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 	}
 }
 
-export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogger, options: ApiWsRestFsOptionsRequired) => {
+export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogger, options: UniversalApiOptionsRequired) => {
 	logger.debug(`runWsPlugin: START`);
 	const { enableWs, wsHandlers } = options;
 	const httpServer = server.httpServer;

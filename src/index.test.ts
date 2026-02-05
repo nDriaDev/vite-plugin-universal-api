@@ -1,13 +1,13 @@
 import { PreviewServer, ResolvedConfig, ViteDevServer } from "vite";
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ApiWsRestFsOptions, ApiWsRestFsOptionsRequired, ApiWsRestFsRequest } from "./models/index.model";
+import { UniversalApiOptions, UniversalApiOptionsRequired, UniversalApiRequest } from "./models/index.model";
 import path from "node:path";
 import { mkdirp } from 'mkdirp';
 import * as fs from 'node:fs';
 import { rimraf } from 'rimraf';
 import { Constants } from "./utils/constants";
 import { EventEmitter, PassThrough } from "node:stream";
-import { ApiWsRestFsError } from "./utils/Error";
+import { UniversalApiError } from "./utils/Error";
 import { Utils } from "./utils/utils";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { randomBytes } from "node:crypto";
@@ -197,7 +197,7 @@ vi.mock('./utils/utils', async (importOriginal) => {
 						return {
 							use() {},
 							handle() {
-								throw new ApiWsRestFsError("generic", "TIMEOUT", "");
+								throw new UniversalApiError("generic", "TIMEOUT", "");
 							}
 						}
 					} else {
@@ -206,7 +206,7 @@ vi.mock('./utils/utils', async (importOriginal) => {
 				}),
 				parseRequest: vi.fn().mockImplementation((...args) => {
 					if(mocks.utils.request.parseRequest.shouldFail) {
-						throw new ApiWsRestFsError("generic", "ERROR", "");
+						throw new UniversalApiError("generic", "ERROR", "");
 					} else {
 						return mocks.utils.request.parseRequest.original.apply(requestsContext,args)
 					}
@@ -319,7 +319,7 @@ const getServer = () => ({
 		use: vi.fn()
 	}
 }) as any;
-const generateOptions = (opt?: ApiWsRestFsOptions) => import('./index').then(module => module.default(opt) as unknown as { configResolved: (conf: ResolvedConfig) => Promise<void>, configureServer: (server: ViteDevServer) => void, configurePreviewServer: (server: PreviewServer) => void });
+const generateOptions = (opt?: UniversalApiOptions) => import('./index').then(module => module.default(opt) as unknown as { configResolved: (conf: ResolvedConfig) => Promise<void>, configureServer: (server: ViteDevServer) => void, configurePreviewServer: (server: PreviewServer) => void });
 const createMultipartBody = (parts: object, boundary = `----TestBoundary${Date.now()}`) => {
 	const chunks = [];
 	if (parts instanceof URLSearchParams) {
@@ -510,7 +510,7 @@ const executeTests = (testName: any, cb: () => Promise<void>) => {
 			describe(key, async () => {
 				const value = testName[key as keyof typeof testName];
 				if(typeof value === "string") {
-					it(value, cb);
+					it(value, async () => await cb);
 				} else {
 					executeTests(value, cb);
 				}
@@ -815,7 +815,7 @@ describe('Test plugin', async () => {
 	let wsConnection3: WebSocketConnection;
 	let wsDeflate;
 	let upgradeWsCallback;
-	let executeWsPlugin: (opt: Partial<ApiWsRestFsOptionsRequired>, req?: any) => Promise<void>;
+	let executeWsPlugin: (opt: Partial<UniversalApiOptionsRequired>, req?: any) => Promise<void>;
 	let middlewareHandler: (...args: unknown[]) => Promise<void>,
 		expects: (jsonResponse?: any) => Promise<void> | void = () => { },
 		executeMiddleware = true,
@@ -839,14 +839,14 @@ describe('Test plugin', async () => {
     };
 	const mockViteWsServer = { httpServer: mockWsHttpServer };
 	const mockWsRequest = { url: "/api/ws", headers: { upgrade: "websocket" } };
-	const createMockRequest = (method: string, queryParams = {}, body = {}): ApiWsRestFsRequest => ({
+	const createMockRequest = (method: string, queryParams = {}, body = {}): UniversalApiRequest => ({
         url: "/api/users",
 		method,
         query: {
             get: (key: string) => queryParams[key as keyof typeof queryParams] ?? null
         },
         body
-    } as unknown as ApiWsRestFsRequest);
+    } as unknown as UniversalApiRequest);
 	const testFunction = async () => {
 		executeMiddleware && await middlewareHandler(req, res, next);
 		await expects();
@@ -863,7 +863,7 @@ describe('Test plugin', async () => {
 		let result;
 		vi.clearAllMocks();
 		logSpy.mockClear();
-		const mockOptions: ApiWsRestFsOptions = {
+		const mockOptions: UniversalApiOptions = {
 			endpointPrefix: [ENDPOINT_PREFIX, "/test"],
 			fsDir: MOCK_DIR.NAME,
 			logLevel: 'info',
@@ -917,7 +917,7 @@ describe('Test plugin', async () => {
 				server_no_context_takeover: false,
 				client_no_context_takeover: false
 			});
-			executeWsPlugin = async (opt: Partial<ApiWsRestFsOptionsRequired>, options?: {req?: any, socket?: any}) => {
+			executeWsPlugin = async (opt: Partial<UniversalApiOptionsRequired>, options?: {req?: any, socket?: any}) => {
 				const opts = Utils.plugin.initOptions(mockOptions, CONF);
 				runWsPlugin(
 					mockViteWsServer as unknown as ViteDevServer,
@@ -1075,7 +1075,7 @@ describe('Test plugin', async () => {
 				expects = () => {
 					expect(() => {
 						instance!.request.applyPaginationAndFilters({} as any, {} as any, {} as any, {} as any, {} as any, mockDataFile);
-					}).toThrow(ApiWsRestFsError);
+					}).toThrow(UniversalApiError);
 				}
 				break;
 			case TEST_NAME.UTILS.DATA_NULL:
@@ -1934,7 +1934,7 @@ describe('Test plugin', async () => {
 				break;
 			case TEST_NAME.UTILS.MK_DIR_ERROR:
 				try {
-					result = await instance!.files.createDir(path.join(process.cwd(), 'TODO.md', "t"));
+					result = await instance!.files.createDir(path.join(process.cwd(), 'README.md', "t"));
 				} catch (error) {
 					result = (error as Error).message
 				}
@@ -1945,7 +1945,7 @@ describe('Test plugin', async () => {
 				break;
 			case TEST_NAME.UTILS.DIR_FILE_LIST_ENOTDIR:
 				try {
-					result = await instance!.files.directoryFileList(path.join(process.cwd(), 'TODO.md', "t"));
+					result = await instance!.files.directoryFileList(path.join(process.cwd(), 'README.md'));
 				} catch (error) {
 					result = (error as Error).message
 				}
@@ -2624,7 +2624,7 @@ describe('Test plugin', async () => {
 					}
 				];
 				expects = () => {
-					expect(logSpy).toHaveBeenCalledWith("\x1b[1;93mvite-plugin-ws-rest-fs-api\x1b[0m handlingApiRestRequest: Request handler is disabled\n");
+					expect(logSpy).toHaveBeenCalledWith("\x1b[1;93mvite-plugin-universal-api\x1b[0m handlingApiRestRequest: Request handler is disabled\n");
 					expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
 					expect(res.statusCode).toBe(200);
 					const jsonResponse = JSON.parse(responseData);
@@ -2641,7 +2641,7 @@ describe('Test plugin', async () => {
 					}
 				];
 				expects = () => {
-					expect(logSpy).toHaveBeenCalledWith("\x1b[1;93mvite-plugin-ws-rest-fs-api\x1b[0m handlingApiRestRequest: Request url and handler have different http method\n");
+					expect(logSpy).toHaveBeenCalledWith("\x1b[1;93mvite-plugin-universal-api\x1b[0m handlingApiRestRequest: Request url and handler have different http method\n");
 					expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
 					expect(res.statusCode).toBe(200);
 					const jsonResponse = JSON.parse(responseData);
@@ -2660,7 +2660,7 @@ describe('Test plugin', async () => {
 					}
 				];
 				expects = () => {
-					expect(logSpy).toHaveBeenCalledWith("\x1b[1;93mvite-plugin-ws-rest-fs-api\x1b[0m handlingApiRestRequest: request execution will be delayed by 10\n");
+					expect(logSpy).toHaveBeenCalledWith("\x1b[1;93mvite-plugin-universal-api\x1b[0m handlingApiRestRequest: request execution will be delayed by 10\n");
 					expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
 					expect(res.statusCode).toBe(500);
 					const jsonResponse = JSON.parse(responseData);

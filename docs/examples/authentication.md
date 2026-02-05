@@ -6,7 +6,7 @@ JWT-based authentication for REST and WebSocket.
 
 ```typescript
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import mockApi from '@ndriadev/vite-plugin-universal-api'
 
 const users = [{ username: 'admin', password: 'admin123' }]
 const tokens = new Map()
@@ -29,7 +29,7 @@ export default defineConfig({
   plugins: [
     mockApi({
       endpointPrefix: '/api',
-      
+
       handlers: [
         // Login
         {
@@ -37,22 +37,22 @@ export default defineConfig({
           method: 'POST',
           handle: async (req, res) => {
             const user = users.find(
-              u => u.username === req.body.username && 
+              u => u.username === req.body.username &&
                    u.password === req.body.password
             )
-            
+
             if (!user) {
               res.writeHead(401)
               res.end(JSON.stringify({ error: 'Invalid credentials' }))
               return
             }
-            
+
             const token = generateToken(user.username)
             res.writeHead(200)
             res.end(JSON.stringify({ token }))
           }
         },
-        
+
         // Protected endpoint
         {
           pattern: '/protected',
@@ -61,7 +61,7 @@ export default defineConfig({
             try {
               const token = req.headers.authorization?.replace('Bearer ', '')
               const user = verifyToken(token)
-              
+
               res.writeHead(200)
               res.end(JSON.stringify({ message: 'Protected data', user }))
             } catch (err) {
@@ -71,17 +71,17 @@ export default defineConfig({
           }
         }
       ],
-      
+
       // Authenticated WebSocket
       enableWs: true,
       wsHandlers: [
         {
           pattern: '/ws/private',
-          
+
           authenticate: async (req) => {
             const url = new URL(req.url, 'ws://localhost')
             const token = url.searchParams.get('token')
-            
+
             try {
               const user = verifyToken(token)
               return { success: true, data: { user } }
@@ -89,7 +89,7 @@ export default defineConfig({
               return { success: false, code: 4001, reason: 'Invalid token' }
             }
           },
-          
+
           onConnect: (conn) => {
             conn.send({ type: 'authenticated', user: conn.authData.user })
           }

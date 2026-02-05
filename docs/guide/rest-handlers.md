@@ -17,7 +17,7 @@ While File-System API serves static files, REST Handlers let you:
 
 ```typescript
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import mockApi from '@ndriadev/vite-plugin-universal-api'
 
 export default defineConfig({
   plugins: [
@@ -29,13 +29,13 @@ export default defineConfig({
           method: 'GET',
           handle: async (req, res) => {
             const userId = req.params.id
-            
+
             // Your custom logic
-            const user = { 
-              id: userId, 
-              name: `User ${userId}` 
+            const user = {
+              id: userId,
+              name: `User ${userId}`
             }
-            
+
             res.writeHead(200, { 'Content-Type': 'application/json' })
             res.end(JSON.stringify(user))
           }
@@ -56,14 +56,14 @@ Supports Ant-style path patterns:
 {
   // Exact match
   pattern: '/users/profile',
-  
+
   // Path parameters
   pattern: '/users/{id}',
   pattern: '/posts/{postId}/comments/{commentId}',
-  
+
   // Wildcard (single segment)
   pattern: '/api/*/data',
-  
+
   // Double wildcard (multiple segments)
   pattern: '/files/**',
 }
@@ -85,7 +85,7 @@ Supports Ant-style path patterns:
 ### Request Object
 
 ```typescript
-interface ApiWsRestFsRequest {
+interface UniversalApiRequest {
   method: string
   url: string
   headers: Record<string, string>
@@ -106,13 +106,13 @@ interface ApiWsRestFsRequest {
   method: 'GET',
   handle: async (req, res) => {
     const user = database.users.find(u => u.id === req.params.id)
-    
+
     if (!user) {
       res.writeHead(404, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: 'User not found' }))
       return
     }
-    
+
     res.writeHead(200, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify(user))
   }
@@ -129,23 +129,23 @@ interface ApiWsRestFsRequest {
     // Validation
     if (!req.body.email || !req.body.name) {
       res.writeHead(400, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Validation failed',
         details: { email: 'required', name: 'required' }
       }))
       return
     }
-    
+
     // Create user
     const newUser = {
       id: generateId(),
       ...req.body,
       createdAt: new Date().toISOString()
     }
-    
+
     database.users.push(newUser)
-    
-    res.writeHead(201, { 
+
+    res.writeHead(201, {
       'Content-Type': 'application/json',
       'Location': `/api/users/${newUser.id}`
     })
@@ -162,19 +162,19 @@ interface ApiWsRestFsRequest {
   method: 'PUT',
   handle: async (req, res) => {
     const index = database.users.findIndex(u => u.id === req.params.id)
-    
+
     if (index === -1) {
       res.writeHead(404)
       res.end()
       return
     }
-    
+
     database.users[index] = {
       id: req.params.id,
       ...req.body,
       updatedAt: new Date().toISOString()
     }
-    
+
     res.writeHead(200, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify(database.users[index]))
   }
@@ -189,15 +189,15 @@ interface ApiWsRestFsRequest {
   method: 'DELETE',
   handle: async (req, res) => {
     const index = database.users.findIndex(u => u.id === req.params.id)
-    
+
     if (index === -1) {
       res.writeHead(404)
       res.end()
       return
     }
-    
+
     database.users.splice(index, 1)
-    
+
     res.writeHead(204)  // No Content
     res.end()
   }
@@ -232,16 +232,16 @@ interface ApiWsRestFsRequest {
       res.end('No file uploaded')
       return
     }
-    
+
     const file = req.files[0]
-    
+
     // Process file
     console.log('Uploaded:', file.filename, file.contentType)
-    
+
     res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ 
+    res.end(JSON.stringify({
       filename: file.filename,
-      size: file.content.length 
+      size: file.content.length
     }))
   }
 }
@@ -255,11 +255,11 @@ interface ApiWsRestFsRequest {
   method: 'GET',
   handle: async (req, res) => {
     const { q, limit = '10', offset = '0' } = req.query
-    
+
     const results = database.users
       .filter(u => u.name.toLowerCase().includes(q.toLowerCase()))
       .slice(parseInt(offset), parseInt(offset) + parseInt(limit))
-    
+
     res.writeHead(200, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({
       results,
@@ -282,17 +282,17 @@ mockApi({
       console.log(`${req.method} ${req.url}`)
       next()
     },
-    
+
     // Authentication
     async (req, res, next) => {
       const token = req.headers.authorization
-      
+
       if (!token) {
         res.writeHead(401, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ error: 'Unauthorized' }))
         return
       }
-      
+
       try {
         req.user = await verifyToken(token)
         next()
@@ -302,7 +302,7 @@ mockApi({
       }
     }
   ],
-  
+
   handlers: [
     {
       pattern: '/protected/data',
@@ -324,7 +324,7 @@ mockApi({
   errorMiddlewares: [
     (err, req, res, next) => {
       console.error('API Error:', err)
-      
+
       if (err.name === 'ValidationError') {
         res.writeHead(400, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ error: err.message }))
@@ -332,7 +332,7 @@ mockApi({
         next(err)  // Pass to next error handler
       }
     },
-    
+
     // Generic error handler
     (err, req, res, next) => {
       res.writeHead(500, { 'Content-Type': 'application/json' })
@@ -350,7 +350,7 @@ You can use both approaches together:
 mockApi({
   endpointPrefix: '/api',
   fsDir: 'mock',  // File-system for static data
-  
+
   handlers: [
     // Custom handler for search
     {
@@ -417,9 +417,9 @@ if (!req.body.email || !isValidEmail(req.body.email)) {
 ### 4. Use TypeScript Types
 
 ```typescript
-import type { ApiWsRestFsRequest } from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import type { UniversalApiRequest } from '@ndriadev/vite-plugin-universal-api'
 
-handle: async (req: ApiWsRestFsRequest, res) => {
+handle: async (req: UniversalApiRequest, res) => {
   // Full autocomplete!
 }
 ```
@@ -437,7 +437,7 @@ handle: async (req: ApiWsRestFsRequest, res) => {
       res.end('Server Error')
       return
     }
-    
+
     res.writeHead(200)
     res.end('Success')
   }

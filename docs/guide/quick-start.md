@@ -1,13 +1,13 @@
 # Quick Start
 
-Get up and running with vite-plugin-ws-rest-fs-api in minutes. This guide covers all three approaches: File-System API, REST Handlers, and WebSocket.
+Get up and running with vite-plugin-universal-api in minutes. This guide covers all three approaches: File-System API, REST Handlers, and WebSocket.
 
 ## Three Approaches in One Plugin
 
 This plugin offers three complementary ways to mock APIs:
 
 1. **📁 File-System API** - Zero-config file serving
-2. **🔄 REST Handlers** - Custom programmatic handlers  
+2. **🔄 REST Handlers** - Custom programmatic handlers
 3. **⚡ WebSocket** - Real-time bidirectional communication
 
 You can use one, two, or all three approaches together!
@@ -21,7 +21,7 @@ Perfect for static mock data and quick prototyping.
 ```typescript
 // vite.config.ts
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import mockApi from '@ndriadev/vite-plugin-universal-api'
 
 export default defineConfig({
   plugins: [
@@ -131,16 +131,16 @@ mockApi({
       method: 'GET',
       handle: async (req, res) => {
         const userId = req.params.id
-        
+
         // Your custom logic
         const user = await findUserInDatabase(userId)
-        
+
         if (!user) {
           res.writeHead(404, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ error: 'User not found' }))
           return
         }
-        
+
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify(user))
       }
@@ -164,7 +164,7 @@ mockApi({
         res.end(JSON.stringify(user))
       }
     },
-    
+
     // POST: Create user
     {
       pattern: '/users',
@@ -175,12 +175,12 @@ mockApi({
           ...req.body
         }
         users.push(newUser)
-        
+
         res.writeHead(201, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify(newUser))
       }
     },
-    
+
     // PUT: Update user
     {
       pattern: '/users/{id}',
@@ -192,13 +192,13 @@ mockApi({
           res.end()
           return
         }
-        
+
         users[index] = { id: req.params.id, ...req.body }
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify(users[index]))
       }
     },
-    
+
     // DELETE: Remove user
     {
       pattern: '/users/{id}',
@@ -210,7 +210,7 @@ mockApi({
           res.end()
           return
         }
-        
+
         users.splice(index, 1)
         res.writeHead(204)
         res.end()
@@ -236,17 +236,17 @@ mockApi({
       console.log(`${req.method} ${req.url}`)
       next()
     },
-    
+
     // Authentication
     async (req, res, next) => {
       const token = req.headers.authorization
-      
+
       if (!token) {
         res.writeHead(401, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ error: 'Unauthorized' }))
         return
       }
-      
+
       try {
         req.body.user = await verifyToken(token)
         next()
@@ -256,7 +256,7 @@ mockApi({
       }
     }
   ],
-  
+
   handlers: [
     {
       pattern: '/protected/data',
@@ -289,14 +289,14 @@ mockApi({
         console.log('Client connected:', conn.id)
         conn.send({ type: 'welcome', message: 'Connected to chat!' })
       },
-      
+
       onMessage: (conn, data) => {
         console.log('Message received:', data)
-        
+
         // Broadcast to all clients
         conn.broadcast(data, { includeSelf: true })
       },
-      
+
       onClose: (conn, code, reason) => {
         console.log('Client disconnected:', conn.id, code, reason)
       }
@@ -340,23 +340,23 @@ mockApi({
   wsHandlers: [
     {
       pattern: '/ws/chat',
-      
+
       onConnect: (conn) => {
         conn.send({ type: 'connected', id: conn.id })
       },
-      
+
       onMessage: (conn, data) => {
         switch (data.type) {
           case 'join':
             const room = data.room || 'general'
             conn.joinRoom(room)
-            
+
             conn.broadcast(
               { type: 'user-joined', username: data.username },
               { rooms: [room], includeSelf: false }
             )
             break
-            
+
           case 'message':
             conn.broadcast(
               {
@@ -368,7 +368,7 @@ mockApi({
               { rooms: [data.room], includeSelf: true }
             )
             break
-            
+
           case 'leave':
             conn.leaveRoom(data.room)
             conn.broadcast(
@@ -391,39 +391,39 @@ mockApi({
   wsHandlers: [
     {
       pattern: '/ws/private',
-      
+
       // Authenticate on connection
       authenticate: async (req) => {
         const token = new URL(req.url!, 'ws://localhost').searchParams.get('token')
-        
+
         if (!token) {
-          return { 
-            success: false, 
-            code: 4001, 
-            reason: 'No token provided' 
+          return {
+            success: false,
+            code: 4001,
+            reason: 'No token provided'
           }
         }
-        
+
         try {
           const user = await verifyToken(token)
           return { success: true, data: { user } }
         } catch (err) {
-          return { 
-            success: false, 
-            code: 4002, 
-            reason: 'Invalid token' 
+          return {
+            success: false,
+            code: 4002,
+            reason: 'Invalid token'
           }
         }
       },
-      
+
       onConnect: (conn) => {
         // conn.authData contains the user from authenticate
-        conn.send({ 
-          type: 'authenticated', 
-          user: conn.authData.user 
+        conn.send({
+          type: 'authenticated',
+          user: conn.authData.user
         })
       },
-      
+
       onMessage: (conn, data) => {
         // Use conn.authData.user for authorization
         if (hasPermission(conn.authData.user, data.action)) {
@@ -452,7 +452,7 @@ You can use all three approaches together:
 mockApi({
   endpointPrefix: '/api',
   fsDir: 'mock',  // File-based API
-  
+
   // REST handlers for dynamic endpoints
   handlers: [
     {
@@ -465,7 +465,7 @@ mockApi({
       }
     }
   ],
-  
+
   // WebSocket for real-time features
   enableWs: true,
   wsHandlers: [
@@ -544,20 +544,20 @@ mockApi({
       res.writeHead(201, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(user))
     }},
-    
+
     // Read (all)
     { pattern: '/users', method: 'GET', handle: (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(db.users))
     }},
-    
+
     // Read (one)
     { pattern: '/users/{id}', method: 'GET', handle: (req, res) => {
       const user = db.users.find(u => u.id == req.params.id)
       res.writeHead(user ? 200 : 404, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(user || { error: 'Not found' }))
     }},
-    
+
     // Update
     { pattern: '/users/{id}', method: 'PUT', handle: (req, res) => {
       const index = db.users.findIndex(u => u.id == req.params.id)
@@ -570,7 +570,7 @@ mockApi({
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(db.users[index]))
     }},
-    
+
     // Delete
     { pattern: '/users/{id}', method: 'DELETE', handle: (req, res) => {
       const index = db.users.findIndex(u => u.id == req.params.id)
@@ -594,13 +594,13 @@ mockApi({
   errorMiddlewares: [
     (err, req, res, next) => {
       console.error('Error:', err)
-      
+
       // Custom error types
       if (err.name === 'ValidationError') {
         res.writeHead(400, { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify({ 
+        res.end(JSON.stringify({
           error: 'Validation failed',
-          details: err.errors 
+          details: err.errors
         }))
       } else if (err.name === 'NotFoundError') {
         res.writeHead(404, { 'Content-Type': 'application/json' })
@@ -637,9 +637,9 @@ Changes to mock files are automatically detected - just edit and save!
 ::: tip TypeScript
 The plugin is fully typed. Import types for better IDE support:
 ```typescript
-import type { 
-  ApiWsRestFsRequest, 
-  IWebSocketConnection 
-} from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import type {
+  UniversalApiRequest,
+  IWebSocketConnection
+} from '@ndriadev/vite-plugin-universal-api'
 ```
 :::

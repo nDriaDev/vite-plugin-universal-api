@@ -6,27 +6,27 @@
             http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
 
 <url>
-	<loc>https://vite-plugin-ws-rest-fs-api.ndria.dev/</loc>
+	<loc>https://vite-plugin-universal-api.ndria.dev/</loc>
 	<lastmod>2026-02-04T14:25:27.563Z</lastmod>
 </url>
 
 <url>
-	<loc>https://vite-plugin-ws-rest-fs-api.ndria.dev/guide/getting-started/</loc>
+	<loc>https://vite-plugin-universal-api.ndria.dev/guide/getting-started/</loc>
 	<lastmod>2026-02-04T14:25:27.563Z</lastmod>
 </url>
 
 <url>
-	<loc>https://vite-plugin-ws-rest-fs-api.ndria.dev/guide/quick-start/</loc>
+	<loc>https://vite-plugin-universal-api.ndria.dev/guide/quick-start/</loc>
 	<lastmod>2026-02-04T14:25:27.563Z</lastmod>
 </url>
 
 <url>
-	<loc>https://vite-plugin-ws-rest-fs-api.ndria.dev/api/</loc>
+	<loc>https://vite-plugin-universal-api.ndria.dev/api/</loc>
 	<lastmod>2026-02-04T14:25:27.563Z</lastmod>
 </url>
 
 <url>
-	<loc>https://vite-plugin-ws-rest-fs-api.ndria.dev/example</loc>
+	<loc>https://vite-plugin-universal-api.ndria.dev/example</loc>
 	<lastmod>2026-02-04T14:25:27.563Z</lastmod>
 </url>
 

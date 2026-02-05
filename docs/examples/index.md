@@ -1,6 +1,6 @@
 # Examples
 
-Practical, real-world examples showing how to use vite-plugin-ws-rest-fs-api in different scenarios.
+Practical, real-world examples showing how to use vite-plugin-universal-api in different scenarios.
 
 ## Overview
 
@@ -27,7 +27,7 @@ Serve JSON files directly:
 
 ```typescript
 // vite.config.ts
-import mockApi from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import mockApi from '@ndriadev/vite-plugin-universal-api'
 
 export default {
   plugins: [
@@ -141,7 +141,7 @@ mockApi({
   fsDir: 'mock',
   logLevel: 'debug',           // See all requests
   delay: 500,                   // Simulate network latency
-  
+
   handlers: [
     // Override specific endpoints
     {
@@ -149,10 +149,10 @@ mockApi({
       method: 'GET',
       handle: (req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify({ 
-          id: 1, 
+        res.end(JSON.stringify({
+          id: 1,
           name: 'Dev User',
-          role: 'admin' 
+          role: 'admin'
         }))
       }
     }
@@ -174,7 +174,7 @@ mockApi({
         res.end('Internal Server Error')
       }
     },
-    
+
     // Simulate slow responses
     {
       pattern: '/api/slow',
@@ -185,7 +185,7 @@ mockApi({
         res.end('Finally!')
       }
     },
-    
+
     // Simulate timeout
     {
       pattern: '/api/timeout',
@@ -204,7 +204,7 @@ mockApi({
 ```typescript
 mockApi({
   fsDir: 'mock',
-  
+
   handlers: [
     // New feature being developed
     {
@@ -218,7 +218,7 @@ mockApi({
       }
     }
   ],
-  
+
   // Real-time updates for new feature
   enableWs: true,
   wsHandlers: [
@@ -243,31 +243,31 @@ import { useEffect, useState } from 'react'
 export function useWebSocket(url: string) {
   const [ws, setWs] = useState<WebSocket | null>(null)
   const [messages, setMessages] = useState<any[]>([])
-  
+
   useEffect(() => {
     const socket = new WebSocket(url)
-    
+
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data)
       setMessages(prev => [...prev, data])
     }
-    
+
     setWs(socket)
-    
+
     return () => socket.close()
   }, [url])
-  
+
   const send = (data: any) => {
     ws?.send(JSON.stringify(data))
   }
-  
+
   return { messages, send }
 }
 
 // In component
 function ChatComponent() {
   const { messages, send } = useWebSocket('ws://localhost:5173/api/ws/chat')
-  
+
   return (
     <div>
       {messages.map((msg, i) => (
@@ -292,7 +292,7 @@ let ws: WebSocket | null = null
 
 onMounted(() => {
   ws = new WebSocket('ws://localhost:5173/api/ws/chat')
-  
+
   ws.onmessage = (event) => {
     messages.value.push(JSON.parse(event.data))
   }

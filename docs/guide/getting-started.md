@@ -1,10 +1,10 @@
 # Getting Started
 
-Welcome to **vite-plugin-ws-rest-fs-api**! This guide will help you get up and running with mock APIs in your Vite project.
+Welcome to **vite-plugin-universal-api**! This guide will help you get up and running with mock APIs in your Vite project.
 
-## What is vite-plugin-ws-rest-fs-api?
+## What is vite-plugin-universal-api?
 
-vite-plugin-ws-rest-fs-api is a comprehensive Vite plugin that transforms your development server into a powerful mock backend. It provides three complementary approaches to handle API requests:
+vite-plugin-universal-api is a comprehensive Vite plugin that transforms your development server into a powerful mock backend. It provides three complementary approaches to handle API requests:
 
 1. **📁 File-System Based API** - Automatically serve mock data from your file system
 2. **🔄 REST API Handlers** - Define custom programmatic handlers for dynamic responses
@@ -49,15 +49,15 @@ Install the plugin as a development dependency:
 ::: code-group
 
 ```bash [pnpm]
-pnpm add -D @ndriadev/vite-plugin-ws-rest-fs-api
+pnpm add -D @ndriadev/vite-plugin-universal-api
 ```
 
 ```bash [npm]
-npm install -D @ndriadev/vite-plugin-ws-rest-fs-api
+npm install -D @ndriadev/vite-plugin-universal-api
 ```
 
 ```bash [yarn]
-yarn add -D @ndriadev/vite-plugin-ws-rest-fs-api
+yarn add -D @ndriadev/vite-plugin-universal-api
 ```
 
 :::
@@ -70,7 +70,7 @@ Add the plugin to your `vite.config.ts`:
 
 ```typescript
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import mockApi from '@ndriadev/vite-plugin-universal-api'
 
 export default defineConfig({
   plugins: [
@@ -149,8 +149,8 @@ Now that you have a basic setup running, explore more features:
 If you run into issues:
 
 1. Check the [Troubleshooting](/guide/troubleshooting) guide
-2. Search [GitHub Issues](https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/issues)
-3. Ask in [GitHub Discussions](https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/discussions)
+2. Search [GitHub Issues](https://github.com/nDriaDev/vite-plugin-universal-api/issues)
+3. Ask in [GitHub Discussions](https://github.com/nDriaDev/vite-plugin-universal-api/discussions)
 
 ## Next Steps
 
@@ -163,9 +163,9 @@ If you run into issues:
 
 ## Community
 
-- [GitHub Discussions](https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/discussions)
-- [GitHub Issues](https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/issues)
+- [GitHub Discussions](https://github.com/nDriaDev/vite-plugin-universal-api/discussions)
+- [GitHub Issues](https://github.com/nDriaDev/vite-plugin-universal-api/issues)
 
 ## License
 
-[MIT](https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/blob/main/LICENSE) © [nDriaDev](https://github.com/nDriaDev)
+[MIT](https://github.com/nDriaDev/vite-plugin-universal-api/blob/main/LICENSE) © [nDriaDev](https://github.com/nDriaDev)

@@ -1,5 +1,5 @@
 {
-	"name": "@ndriadev/vite-plugin-ws-rest-fs-api",
+	"name": "@ndriadev/vite-plugin-universal-api",
 	"description": "Plugin Mock WebSocket, REST and File-based APIs for Vite",
 	"private": false,
 	"version": "1.0.0",
@@ -82,7 +82,7 @@
 	],
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api"
+		"url": "git+https://github.com/nDriaDev/vite-plugin-universal-api"
 	},
 	"author": {
 		"name": "Andrea Cosentino",
@@ -91,8 +91,8 @@
 	},
 	"readmeFilename": "README.md",
 	"bugs": {
-		"url": "https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/issues"
+		"url": "https://github.com/nDriaDev/vite-plugin-universal-api/issues"
 	},
-	"homepage": "https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api",
+	"homepage": "https://github.com/nDriaDev/vite-plugin-universal-api",
 	"license": "MIT"
 }

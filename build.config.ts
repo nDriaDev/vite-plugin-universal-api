@@ -1,7 +1,7 @@
 import { defineBuildConfig } from 'unbuild';
 
 export default defineBuildConfig({
-    name: "vite-plugin-ws-rest-fs-api",
+    name: "vite-plugin-universal-api",
     entries: ['src/index'],
     externals: ['vite'],
     clean: true,

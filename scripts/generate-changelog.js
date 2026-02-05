@@ -118,7 +118,7 @@ function categorizeCommit(subject) {
 
 function generateChangelogEntry(version, commits) {
 	const date = new Date().toISOString().split('T')[0];
-	const repoUrl = 'https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api';
+	const repoUrl = 'https://github.com/nDriaDev/vite-plugin-universal-api';
 
 	let entry = `## [${version}](${repoUrl}/releases/tag/v${version}) - ${date}\n\n`;
 

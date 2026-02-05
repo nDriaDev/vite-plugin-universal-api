@@ -122,8 +122,8 @@ function main() {
 		log('✅ Build verification PASSED!', 'green');
 		log('\nYour package is ready for publishing! 🚀', 'green');
 		log('\nSupported usage patterns:', 'blue');
-		log('  • CommonJS: require("@ndriadev/vite-plugin-ws-rest-fs-api")', 'yellow');
-		log('  • ESM: import mockApi from "@ndriadev/vite-plugin-ws-rest-fs-api"', 'yellow');
+		log('  • CommonJS: require("@ndriadev/vite-plugin-universal-api")', 'yellow');
+		log('  • ESM: import mockApi from "@ndriadev/vite-plugin-universal-api"', 'yellow');
 		log('  • TypeScript: Full type support ✨', 'yellow');
 		log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n', 'blue');
 		process.exit(0);

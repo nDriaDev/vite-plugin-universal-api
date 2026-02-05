@@ -1,13 +1,13 @@
 import { Connect, Plugin } from "vite";
-import { ApiWsRestFsOptions, ApiWsRestFsOptionsRequired } from "./models/index.model";
+import { UniversalApiOptions, UniversalApiOptionsRequired } from "./models/index.model";
 import { Logger } from "./utils/Logger";
 import { Constants } from "./utils/constants";
 import { Utils } from "./utils/utils";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { runPlugin, runWsPlugin } from "./utils/plugin";
 
-function plugin(opts?: ApiWsRestFsOptions): Plugin {
-	let options: ApiWsRestFsOptionsRequired,
+function plugin(opts?: UniversalApiOptions): Plugin {
+	let options: UniversalApiOptionsRequired,
 		logger: Logger;
 	return {
 		name: Constants.PLUGIN_NAME,

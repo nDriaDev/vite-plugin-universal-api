@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
-- Initial release of vite-plugin-ws-rest-fs-api
+- Initial release of vite-plugin-universal-api
 - File-System based API for serving mock data from filesystem
 - REST API handlers for custom programmatic responses
 - WebSocket support with rooms and broadcast capabilities
@@ -29,4 +29,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Examples and use cases
 - VitePress documentation site setup
 
-[1.0.0]: https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/releases/tag/v1.0.0
+[1.0.0]: https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v1.0.0

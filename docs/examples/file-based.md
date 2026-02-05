@@ -26,7 +26,7 @@ my-app/
 // vite.config.ts
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import mockApi from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import mockApi from '@ndriadev/vite-plugin-universal-api'
 
 export default defineConfig({
   plugins: [
@@ -34,7 +34,7 @@ export default defineConfig({
     mockApi({
       endpointPrefix: '/api',
       fsDir: 'mock',
-      
+
       // Enable pagination
       pagination: {
         GET: {
@@ -45,7 +45,7 @@ export default defineConfig({
           order: 'order'
         }
       },
-      
+
       // Enable filters
       filters: {
         GET: {
@@ -130,7 +130,7 @@ import { useState, useEffect } from 'react'
 function App() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
-  
+
   useEffect(() => {
     // Fetch all users
     fetch('/api/users')
@@ -140,9 +140,9 @@ function App() {
         setLoading(false)
       })
   }, [])
-  
+
   if (loading) return <div>Loading...</div>
-  
+
   return (
     <div>
       <h1>Users</h1>

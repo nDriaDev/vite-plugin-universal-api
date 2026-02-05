@@ -21,7 +21,7 @@ mock/
 ```typescript
 // vite.config.ts
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import mockApi from '@ndriadev/vite-plugin-universal-api'
 
 export default defineConfig({
   plugins: [
@@ -55,7 +55,7 @@ Looks for: mock/posts/index.json
 
 ```
 Request: GET /api/data
-Looks for: 
+Looks for:
   - mock/data.json
   - mock/data.xml
   - mock/data.txt
@@ -190,12 +190,12 @@ mockApi({
     GET: {
       type: 'query-param',
       filters: [
-        { 
+        {
           key: 'status',
           valueType: 'string',
           comparison: 'eq'
         },
-        { 
+        {
           key: 'minAge',
           field: 'age',
           valueType: 'number',

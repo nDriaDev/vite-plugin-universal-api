@@ -1,5 +1,5 @@
 export const Constants = {
-	PLUGIN_NAME: "vite-plugin-ws-rest-fs-api",
+	PLUGIN_NAME: "vite-plugin-universal-api",
     TOTAL_ELEMENTS_HEADER: "X-Total-Count",
     DELETED_ELEMENTS_HEADER: "X-Deleted-Count",
     HTTP_STATUS_CODE: {

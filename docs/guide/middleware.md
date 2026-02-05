@@ -17,20 +17,20 @@ Global middleware that runs before all handlers in the `handlers` array.
 
 ```typescript
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import mockApi from '@ndriadev/vite-plugin-universal-api'
 
 export default defineConfig({
   plugins: [
     mockApi({
       endpointPrefix: '/api',
-      
+
       handlerMiddlewares: [
         // Logger middleware
         async (req, res, next) => {
           console.log(`${req.method} ${req.url}`)
           next()
         },
-        
+
         // Timing middleware
         async (req, res, next) => {
           const start = Date.now()
@@ -38,7 +38,7 @@ export default defineConfig({
           console.log(`Request took ${Date.now() - start}ms`)
         }
       ],
-      
+
       handlers: [
         {
           pattern: '/users',
@@ -59,7 +59,7 @@ export default defineConfig({
 
 ```typescript
 type MiddlewareFunction = (
-  req: ApiWsRestFsRequest,
+  req: UniversalApiRequest,
   res: ServerResponse,
   next: () => void
 ) => void | Promise<void>
@@ -78,13 +78,13 @@ type MiddlewareFunction = (
 handlerMiddlewares: [
   async (req, res, next) => {
     const token = req.headers.authorization?.replace('Bearer ', '')
-    
+
     if (!token) {
       res.writeHead(401, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: 'No token provided' }))
       return  // Don't call next()
     }
-    
+
     try {
       // Verify token and attach user to request
       req.body.user = await verifyToken(token)
@@ -124,14 +124,14 @@ handlerMiddlewares: [
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-    
+
     // Handle preflight
     if (req.method === 'OPTIONS') {
       res.writeHead(204)
       res.end()
       return
     }
-    
+
     next()
   }
 ]
@@ -148,19 +148,19 @@ handlerMiddlewares: [
     const now = Date.now()
     const windowMs = 60000 // 1 minute
     const maxRequests = 100
-    
+
     if (!rateLimits.has(ip)) {
       rateLimits.set(ip, [])
     }
-    
+
     const requests = rateLimits.get(ip).filter(time => now - time < windowMs)
-    
+
     if (requests.length >= maxRequests) {
       res.writeHead(429, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: 'Too many requests' }))
       return
     }
-    
+
     requests.push(now)
     rateLimits.set(ip, requests)
     next()
@@ -193,11 +193,11 @@ Handle errors that occur during request processing.
 errorMiddlewares: [
   (err, req, res, next) => {
     console.error('Error:', err)
-    
+
     res.writeHead(500, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ 
+    res.end(JSON.stringify({
       error: 'Internal server error',
-      requestId: req.body.requestId 
+      requestId: req.body.requestId
     }))
   }
 ]
@@ -208,7 +208,7 @@ errorMiddlewares: [
 ```typescript
 type ErrorHandlerFunction = (
   err: Error,
-  req: ApiWsRestFsRequest,
+  req: UniversalApiRequest,
   res: ServerResponse,
   next: (err?: Error) => void
 ) => void
@@ -222,28 +222,28 @@ errorMiddlewares: [
   (err, req, res, next) => {
     if (err.name === 'ValidationError') {
       res.writeHead(400, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Validation failed',
-        details: err.details 
+        details: err.details
       }))
       return
     }
-    
+
     if (err.name === 'NotFoundError') {
       res.writeHead(404, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: 'Resource not found' }))
       return
     }
-    
+
     next(err)  // Pass to next error handler
   },
-  
+
   // Generic error handler (catch-all)
   (err, req, res, next) => {
     console.error('Unhandled error:', err)
-    
+
     res.writeHead(500, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ 
+    res.end(JSON.stringify({
       error: 'Internal server error',
       message: process.env.NODE_ENV === 'development' ? err.message : undefined
     }))
@@ -265,7 +265,7 @@ handlerMiddlewares[n]
 Handler (if match found)
   ↓
 Response
-  
+
 (If error occurs)
   ↓
 errorMiddlewares[0]
@@ -281,7 +281,7 @@ Response
 
 ```typescript
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import mockApi from '@ndriadev/vite-plugin-universal-api'
 
 const users = new Map()
 
@@ -289,20 +289,20 @@ export default defineConfig({
   plugins: [
     mockApi({
       endpointPrefix: '/api',
-      
+
       handlerMiddlewares: [
         // 1. Logger
         async (req, res, next) => {
           console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`)
           next()
         },
-        
+
         // 2. CORS
         async (req, res, next) => {
           res.setHeader('Access-Control-Allow-Origin', '*')
           res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE')
           res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-          
+
           if (req.method === 'OPTIONS') {
             res.writeHead(204)
             res.end()
@@ -310,7 +310,7 @@ export default defineConfig({
           }
           next()
         },
-        
+
         // 3. Authentication (skip for public endpoints)
         async (req, res, next) => {
           const publicPaths = ['/api/login', '/api/register']
@@ -318,61 +318,61 @@ export default defineConfig({
             next()
             return
           }
-          
+
           const token = req.headers.authorization?.replace('Bearer ', '')
           if (!token) {
             res.writeHead(401, { 'Content-Type': 'application/json' })
             res.end(JSON.stringify({ error: 'Unauthorized' }))
             return
           }
-          
+
           const user = users.get(token)
           if (!user) {
             res.writeHead(401, { 'Content-Type': 'application/json' })
             res.end(JSON.stringify({ error: 'Invalid token' }))
             return
           }
-          
+
           req.body.currentUser = user
           next()
         },
-        
+
         // 4. Request timing
         async (req, res, next) => {
           const start = Date.now()
-          
+
           // Override res.end to log timing
           const originalEnd = res.end.bind(res)
           res.end = function(...args) {
             console.log(`Request took ${Date.now() - start}ms`)
             return originalEnd(...args)
           }
-          
+
           next()
         }
       ],
-      
+
       errorMiddlewares: [
         // Custom error handler
         (err, req, res, next) => {
           console.error('Error:', err)
-          
+
           if (err.name === 'ValidationError') {
             res.writeHead(400, { 'Content-Type': 'application/json' })
             res.end(JSON.stringify({ error: err.message }))
             return
           }
-          
+
           next(err)
         },
-        
+
         // Generic error handler
         (err, req, res, next) => {
           res.writeHead(500, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ error: 'Internal server error' }))
         }
       ],
-      
+
       handlers: [
         {
           pattern: '/users',

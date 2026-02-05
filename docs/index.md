@@ -2,12 +2,12 @@
 layout: home
 
 hero:
-  name: "vite-plugin-ws-rest-fs-api"
+  name: "vite-plugin-universal-api"
   text: "Mock APIs for Vite"
   tagline: Seamless WebSocket, REST and File-based mock APIs integrated in your Vite development server
   image:
     src: /logo_hd.png
-    alt: vite-plugin-ws-rest-fs-api
+    alt: vite-plugin-universal-api
   actions:
     - theme: brand
       text: Get Started
@@ -17,7 +17,7 @@ hero:
       link: /api/
     - theme: alt
       text: View on GitHub
-      link: https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api
+      link: https://github.com/nDriaDev/vite-plugin-universal-api
 
 features:
   - icon: 📁

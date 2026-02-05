@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Common issues and solutions when using vite-plugin-ws-rest-fs-api.
+Common issues and solutions when using vite-plugin-universal-api.
 
 ## Plugin Not Working
 
@@ -241,13 +241,13 @@ mockApi({
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH')
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
       res.setHeader('Access-Control-Expose-Headers', 'X-Total-Elements, X-Deleted-Elements')
-      
+
       if (req.method === 'OPTIONS') {
         res.writeHead(204)
         res.end()
         return
       }
-      
+
       next()
     }
   ]
@@ -413,9 +413,9 @@ pnpm add -D @types/node
 2. **Import types**
 
 ```typescript
-import type { ApiWsRestFsOptions } from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import type { UniversalApiOptions } from '@ndriadev/vite-plugin-universal-api'
 
-const config: ApiWsRestFsOptions = {
+const config: UniversalApiOptions = {
   endpointPrefix: '/api'
 }
 ```
@@ -437,7 +437,7 @@ If none of these solutions work:
 
 1. **Check plugin version**
 ```bash
-npm list @ndriadev/vite-plugin-ws-rest-fs-api
+npm list @ndriadev/vite-plugin-universal-api
 ```
 
 2. **Enable debug logging**
@@ -448,10 +448,10 @@ mockApi({
 ```
 
 3. **Check GitHub Issues**
-[https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/issues](https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/issues)
+[https://github.com/nDriaDev/vite-plugin-universal-api/issues](https://github.com/nDriaDev/vite-plugin-universal-api/issues)
 
 4. **Ask in Discussions**
-[https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/discussions](https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/discussions)
+[https://github.com/nDriaDev/vite-plugin-universal-api/discussions](https://github.com/nDriaDev/vite-plugin-universal-api/discussions)
 
 ## Common Mistakes
 

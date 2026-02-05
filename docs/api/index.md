@@ -1,6 +1,6 @@
 # Configuration Options
 
-Complete reference for all configuration options available in vite-plugin-ws-rest-fs-api.
+Complete reference for all configuration options available in vite-plugin-universal-api.
 
 ## Basic Options
 
@@ -262,7 +262,7 @@ mockApi({
   errorMiddlewares: [
     (err, req, res, next) => {
       console.error('API Error:', err)
-      
+
       if (err.name === 'ValidationError') {
         res.writeHead(400, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ error: err.message }))
@@ -394,12 +394,12 @@ mockApi({
     GET: {
       type: 'query-param',
       filters: [
-        { 
+        {
           key: 'status',
           valueType: 'string',
           comparison: 'eq'
         },
-        { 
+        {
           key: 'minAge',
           field: 'age',
           valueType: 'number',
@@ -440,7 +440,7 @@ Filters work **only** with:
 
 ```typescript
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import mockApi from '@ndriadev/vite-plugin-universal-api'
 
 export default defineConfig({
   plugins: [
@@ -450,17 +450,17 @@ export default defineConfig({
       logLevel: 'debug',
       endpointPrefix: '/api',
       fsDir: 'mock',
-      
+
       // Performance
       delay: 500,
       gatewayTimeout: 30000,
-      
+
       // Behavior
       noHandledRestFsRequestsAction: '404',
-      
+
       // Parsing
       parser: true,
-      
+
       // Middleware
       handlerMiddlewares: [
         async (req, res, next) => {
@@ -468,7 +468,7 @@ export default defineConfig({
           next()
         }
       ],
-      
+
       errorMiddlewares: [
         (err, req, res, next) => {
           console.error(err)
@@ -476,7 +476,7 @@ export default defineConfig({
           res.end('Server Error')
         }
       ],
-      
+
       // REST handlers
       handlers: [
         {
@@ -488,7 +488,7 @@ export default defineConfig({
           }
         }
       ],
-      
+
       // WebSocket
       enableWs: true,
       wsHandlers: [
@@ -500,7 +500,7 @@ export default defineConfig({
           }
         }
       ],
-      
+
       // Pagination
       pagination: {
         GET: {
@@ -509,7 +509,7 @@ export default defineConfig({
           skip: 'skip'
         }
       },
-      
+
       // Filters
       filters: {
         GET: {

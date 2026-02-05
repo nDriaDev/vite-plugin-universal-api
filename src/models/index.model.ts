@@ -1,7 +1,7 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { AntPathMatcher } from "src/utils/AntPathMatcher";
 import { Connect, LogLevel, ResolvedConfig } from "vite";
-import { IApiWsRestFsError } from "./error.model";
+import { IUniversalApiError } from "./error.model";
 import { IWebSocketConnection, PerMessageDeflateExension } from "./webSocket.model";
 
 /**
@@ -25,7 +25,7 @@ import { IWebSocketConnection, PerMessageDeflateExension } from "./webSocket.mod
  * console.log(req.query.get('q')); // "test"
  * console.log(req.query.get('limit')); // "10"
  */
-export interface ApiWsRestFsRequest extends IncomingMessage {
+export interface UniversalApiRequest extends IncomingMessage {
     /**
 	 * Parsed request body.
 	 * Type depends on the content and parser used.
@@ -94,7 +94,7 @@ export interface ApiWsRestFsRequest extends IncomingMessage {
  * @param res - Node's ServerResponse for sending the response
  *
  * @example
- * const handler: ApiWsRestFsSimpleHandleFunction = async (req, res) => {
+ * const handler: UniversalApiSimpleHandler = async (req, res) => {
  *   const userId = req.params?.id;
  *   const user = await database.getUser(userId);
  *
@@ -102,7 +102,7 @@ export interface ApiWsRestFsRequest extends IncomingMessage {
  *   res.end(JSON.stringify(user));
  * };
  */
-export type ApiWsRestFsSimpleHandleFunction = (req: ApiWsRestFsRequest, res: ServerResponse) => void | Promise<void>;
+export type UniversalApiSimpleHandler = (req: UniversalApiRequest, res: ServerResponse) => void | Promise<void>;
 
 /**
  * Middleware function for pre-processing requests.
@@ -114,7 +114,7 @@ export type ApiWsRestFsSimpleHandleFunction = (req: ApiWsRestFsRequest, res: Ser
  *
  * @example
  * // Authentication middleware
- * const authMiddleware: ApiRestFsMiddlewareFunction = async (req, res, next) => {
+ * const authMiddleware: UniversalApiMiddleware = async (req, res, next) => {
  *   const token = req.headers.authorization;
  *
  *   if (!token) {
@@ -127,7 +127,7 @@ export type ApiWsRestFsSimpleHandleFunction = (req: ApiWsRestFsRequest, res: Ser
  *   next();
  * };
  */
-export type ApiRestFsMiddlewareFunction = (req: ApiWsRestFsRequest, res: ServerResponse, next: Connect.NextFunction) => void | Promise<void>;
+export type UniversalApiMiddleware = (req: UniversalApiRequest, res: ServerResponse, next: Connect.NextFunction) => void | Promise<void>;
 
 /**
  * Error handling middleware function.
@@ -139,7 +139,7 @@ export type ApiRestFsMiddlewareFunction = (req: ApiWsRestFsRequest, res: ServerR
  * @param next - Function to pass error to the next error middleware
  *
  * @example
- * const errorHandler: ApiRestFsErrorHandleFunction = (err, req, res, next) => {
+ * const errorHandler: UniversalApiErrorMiddleware = (err, req, res, next) => {
  *   console.error('Request error:', err);
  *
  *   if (err.code === 'VALIDATION_ERROR') {
@@ -151,7 +151,7 @@ export type ApiRestFsMiddlewareFunction = (req: ApiWsRestFsRequest, res: ServerR
  *   }
  * };
  */
-export type ApiRestFsErrorHandleFunction = (err: any, req: ApiWsRestFsRequest | IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => void | Promise<void>;
+export type UniversalApiErrorMiddleware = (err: any, req: UniversalApiRequest | IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => void | Promise<void>;
 
 /**
  * Parser function for transforming raw HTTP requests.
@@ -162,7 +162,7 @@ export type ApiRestFsErrorHandleFunction = (err: any, req: ApiWsRestFsRequest | 
  *
  * @example
  * // Custom JSON parser
- * const jsonParser: ApiWsRestFsParserFunction = (req, res, next) => {
+ * const jsonParser: UniversalApiParserFunction = (req, res, next) => {
  *   let body = '';
  *   req.on('data', chunk => body += chunk);
  *   req.on('end', () => {
@@ -176,7 +176,7 @@ export type ApiRestFsErrorHandleFunction = (err: any, req: ApiWsRestFsRequest | 
  *   });
  * };
  */
-export type ApiWsRestFsParserFunction = (req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => void | Promise<void>;
+export type UniversalApiParserFunction = (req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => void | Promise<void>;
 
 /**
  * Configuration for request body parsing.
@@ -199,18 +199,18 @@ export type ApiWsRestFsParserFunction = (req: IncomingMessage, res: ServerRespon
  *   })
  * }
  */
-export type APiWsRestFsParser = boolean | {
+export type UniversalApiParser = boolean | {
 	/**
 	 * Parser function(s) to process the request.
 	 * Can be a single function or array of functions (executed in order).
 	 * Compatible with Express parsers like express.json(), express.urlencoded(), etc.
 	 */
-	parser: ApiWsRestFsParserFunction | ApiWsRestFsParserFunction[];
+	parser: UniversalApiParserFunction | UniversalApiParserFunction[];
 
 	/**
 	 * Transform function to extract parsed data from the request.
 	 * Returns an object with body, files, and/or query properties.
-	 * Only non-undefined values are used to construct the final ApiWsRestFsRequest.
+	 * Only non-undefined values are used to construct the final UniversalApiRequest.
 	 *
 	 * @param req - The request after parser processing
 	 * @returns Object containing the extracted data
@@ -229,7 +229,7 @@ export type APiWsRestFsParser = boolean | {
 /**
  * Common pagination options.
  */
-type ApiWsRestFsPaginationCommon = {
+type UniversalApiPaginationCommon = {
     /**
 	 * Query parameter or body field name for the limit value.
 	 * Specifies maximum number of results to return.
@@ -312,7 +312,7 @@ type ApiWsRestFsPaginationCommon = {
  * }
  * // Request body: { pagination: { pageSize: 10, offset: 20 } }
  */
-type ApiWsRestFsPagination = (
+type UniversalApiPagination = (
     | {
         /** Pagination options provided in request body */
         type: "body";
@@ -337,12 +337,12 @@ type ApiWsRestFsPagination = (
         type: "query-param";
         root?: never;
     }
-) & ApiWsRestFsPaginationCommon;
+) & UniversalApiPaginationCommon;
 
 /**
  * Common filter options.
  */
-type ApiWsRestFsFilterCommon = {
+type UniversalApiFilterCommon = {
     /**
 	 * Query parameter or body field name containing the value to filter by.
 	 *
@@ -440,7 +440,7 @@ type ApiWsRestFsFilterCommon = {
  * }
  * // Request body: { filters: { email: "@gmail.com" } }
  */
-type ApiWsRestFsFilter = (
+type UniversalApiFilter = (
     | {
         /** Filter options provided in request body */
         type: "body";
@@ -454,21 +454,21 @@ type ApiWsRestFsFilter = (
 		 */
 		root?: string;
 		/** Array of filter definitions */
-		filters: ApiWsRestFsFilterCommon[];
+		filters: UniversalApiFilterCommon[];
     }
     | {
         /** Filter options provided as URL query parameters */
         type: "query-param";
         root?: never;
 		/** Array of filter definitions */
-		filters: ApiWsRestFsFilterCommon[];
+		filters: UniversalApiFilterCommon[];
     }
 );
 
 /**
  * Common options shared by all handler types.
  */
-type ApiWsRestFsHandlerCommon = {
+type UniversalApiHandlerCommon = {
     /**
      * Apache Ant-style path pattern for URL matching.
      *
@@ -553,7 +553,7 @@ type ApiWsRestFsHandlerCommon = {
 	 *   }
 	 * }
 	 */
-	parser?: APiWsRestFsParser;
+	parser?: UniversalApiParser;
 }
 
 /**
@@ -599,7 +599,7 @@ type ApiWsRestFsHandlerCommon = {
  *   }
  * }
  */
-export type ApiRestFsHandler = (
+export type UniversalApiRestFsHandler = (
     | {
         /**
          * HTTP method(s) handled by this configuration.
@@ -687,7 +687,7 @@ export type ApiRestFsHandler = (
          * // Disable pagination for this endpoint
          * pagination: "none"
          */
-        pagination?: "none" | {inclusive?: ApiWsRestFsPagination, exclusive?: never} | {inclusive?: never, exclusive?: ApiWsRestFsPagination};
+        pagination?: "none" | {inclusive?: UniversalApiPagination, exclusive?: never} | {inclusive?: never, exclusive?: UniversalApiPagination};
 
 		/**
          * Filter configuration for this handler.
@@ -710,7 +710,7 @@ export type ApiRestFsHandler = (
          *   }
          * }
          */
-		filters?: "none" | {inclusive?: ApiWsRestFsFilter, exclusive?: never} | {inclusive?: never, exclusive?: ApiWsRestFsFilter};
+		filters?: "none" | {inclusive?: UniversalApiFilter, exclusive?: never} | {inclusive?: never, exclusive?: UniversalApiFilter};
 	}
 	| {
 		method: "HEAD" | "GET" | "POST";
@@ -745,7 +745,7 @@ export type ApiRestFsHandler = (
          *   res.end(JSON.stringify(response));
          * }
          */
-		postHandle?: (req: ApiWsRestFsRequest, res: ServerResponse, data: string | null) => void | Promise<void>;
+		postHandle?: (req: UniversalApiRequest, res: ServerResponse, data: string | null) => void | Promise<void>;
 		pagination?: never;
 		filters?: never;
 	}
@@ -771,7 +771,7 @@ export type ApiRestFsHandler = (
          *   }
          * }
          */
-		postHandle?: (req: ApiWsRestFsRequest, res: ServerResponse, data: string | null) => void | Promise<void>;
+		postHandle?: (req: UniversalApiRequest, res: ServerResponse, data: string | null) => void | Promise<void>;
 		pagination?: never;
 		filters?: never;
 	}
@@ -795,13 +795,13 @@ export type ApiRestFsHandler = (
          *   }
          * }
          */
-        handle: ApiWsRestFsSimpleHandleFunction;
+        handle: UniversalApiSimpleHandler;
         preHandle?: never;
         postHandle?: never;
         pagination?: never;
 		filters?: never;
     }
-) & ApiWsRestFsHandlerCommon;
+) & UniversalApiHandlerCommon;
 
 /**
  * WebSocket handler configuration.
@@ -842,7 +842,7 @@ export type ApiRestFsHandler = (
  *   ]
  * }
  */
-export type ApiWsHandler = {
+export type UniversalApiWsHandler = {
 	/**
      * Apache Ant-style path pattern for WebSocket URL matching.
      * Same syntax as REST handlers.
@@ -1424,7 +1424,7 @@ export type ApiWsHandler = {
  *   ]
  * }
  */
-export type ApiWsRestFsOptions =
+export type UniversalApiOptions =
 	{
 		/**
 		 * Completely disable the plugin.
@@ -1573,7 +1573,7 @@ export type ApiWsRestFsOptions =
 		 *   })
 		 * }
 		 */
-		parser?: APiWsRestFsParser;
+		parser?: UniversalApiParser;
 
 		/**
 		 * Middleware functions executed before each handler.
@@ -1601,7 +1601,7 @@ export type ApiWsRestFsOptions =
 		 *   }
 		 * ]
 		 */
-		handlerMiddlewares?: ApiRestFsMiddlewareFunction[];
+		handlerMiddlewares?: UniversalApiMiddleware[];
 
 		/**
 		 * Error handling middleware functions.
@@ -1629,7 +1629,7 @@ export type ApiWsRestFsOptions =
 		 *   }
 		 * ]
 		 */
-		errorMiddlewares?: ApiRestFsErrorHandleFunction[];
+		errorMiddlewares?: UniversalApiErrorMiddleware[];
 
 		/**
 		 * REST API handler configurations.
@@ -1655,7 +1655,7 @@ export type ApiWsRestFsOptions =
 		 *   }
 		 * ]
 		 */
-		handlers?: ApiRestFsHandler[];
+		handlers?: UniversalApiRestFsHandler[];
 
 		/**
 		 * WebSocket handlers (not allowed when enableWs is false/undefined).
@@ -1696,7 +1696,7 @@ export type ApiWsRestFsOptions =
 		 *   }
 		 * }
 		 */
-		pagination?: Partial<Record<"ALL" | "HEAD" | "GET" | "POST" | "DELETE", ApiWsRestFsPagination>> | null;
+		pagination?: Partial<Record<"ALL" | "HEAD" | "GET" | "POST" | "DELETE", UniversalApiPagination>> | null;
 
 		/**
 		 * Global filter configuration for file-based endpoints.
@@ -1715,7 +1715,7 @@ export type ApiWsRestFsOptions =
 		 *   }
 		 * }
 		 */
-		filters?: Partial<Record<"ALL" | "HEAD" | "GET" | "POST" | "DELETE", ApiWsRestFsFilter>> | null;
+		filters?: Partial<Record<"ALL" | "HEAD" | "GET" | "POST" | "DELETE", UniversalApiFilter>> | null;
 	} | {
 		disable?: boolean;
 		logLevel?: LogLevel | "debug";
@@ -1731,10 +1731,10 @@ export type ApiWsRestFsOptions =
 		 */
 		enableWs?: true;
 		noHandledRestFsRequestsAction?: "404" | "forward";
-		parser?: APiWsRestFsParser;
-		handlerMiddlewares?: ApiRestFsMiddlewareFunction[];
-		errorMiddlewares?: ApiRestFsErrorHandleFunction[];
-		handlers?: ApiRestFsHandler[];
+		parser?: UniversalApiParser;
+		handlerMiddlewares?: UniversalApiMiddleware[];
+		errorMiddlewares?: UniversalApiErrorMiddleware[];
+		handlers?: UniversalApiRestFsHandler[];
 		/**
 		 * WebSocket handler configurations (required when enableWs is true).
 		 *
@@ -1755,13 +1755,13 @@ export type ApiWsRestFsOptions =
 		 *   }
 		 * ]
 		 */
-		wsHandlers?: ApiWsHandler[];
-		pagination?: Partial<Record<"ALL" | "HEAD" | "GET" | "POST" | "DELETE", ApiWsRestFsPagination>> | null;
-		filters?: Partial<Record<"ALL" | "HEAD" | "GET" | "POST" | "DELETE", ApiWsRestFsFilter>> | null;
+		wsHandlers?: UniversalApiWsHandler[];
+		pagination?: Partial<Record<"ALL" | "HEAD" | "GET" | "POST" | "DELETE", UniversalApiPagination>> | null;
+		filters?: Partial<Record<"ALL" | "HEAD" | "GET" | "POST" | "DELETE", UniversalApiFilter>> | null;
 	}
 
 /** @internal */
-export type ApiWsRestFsOptionsRequired = Omit<Required<ApiWsRestFsOptions>, "handlerMiddlewares" | "endpointPrefix"> & { endpointPrefix: string[], fullFsDir: string | null, config: ResolvedConfig, matcher: AntPathMatcher, middlewares: ApiRestFsMiddlewareFunction[] };
+export type UniversalApiOptionsRequired = Omit<Required<UniversalApiOptions>, "handlerMiddlewares" | "endpointPrefix"> & { endpointPrefix: string[], fullFsDir: string | null, config: ResolvedConfig, matcher: AntPathMatcher, middlewares: UniversalApiMiddleware[] };
 
 /** @internal */
 export interface HandledRequestData {
@@ -1780,7 +1780,7 @@ export interface ApiWsRestFsDataResponse {
 	readFile: boolean;
 	isError: boolean;
 	headers: { name: string, value: string | number | readonly string[] }[],
-	error?: IApiWsRestFsError;
-	req?: ApiWsRestFsRequest | IncomingMessage;
-	errorMiddlewares?: ApiWsRestFsOptionsRequired["errorMiddlewares"];
+	error?: IUniversalApiError;
+	req?: UniversalApiRequest | IncomingMessage;
+	errorMiddlewares?: UniversalApiOptionsRequired["errorMiddlewares"];
 }

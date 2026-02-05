@@ -17,28 +17,28 @@ WebSocket support includes:
 
 ```typescript
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import mockApi from '@ndriadev/vite-plugin-universal-api'
 
 export default defineConfig({
   plugins: [
     mockApi({
       endpointPrefix: '/api',
       enableWs: true,  // Enable WebSocket
-      
+
       wsHandlers: [
         {
           pattern: '/ws/chat',
-          
+
           onConnect: (conn) => {
             console.log('Client connected:', conn.id)
             conn.send({ type: 'welcome', message: 'Welcome!' })
           },
-          
+
           onMessage: (conn, data) => {
             console.log('Received:', data)
             conn.broadcast(data, { includeSelf: true })
           },
-          
+
           onClose: (conn, code, reason) => {
             console.log('Client disconnected:', conn.id)
           }
@@ -82,15 +82,15 @@ Called when a client connects:
 ```typescript
 {
   pattern: '/ws/chat',
-  
+
   onConnect: (conn) => {
     // Send welcome message
-    conn.send({ 
-      type: 'connected', 
+    conn.send({
+      type: 'connected',
       id: conn.id,
       timestamp: Date.now()
     })
-    
+
     // Access connection info
     console.log('New connection:', {
       id: conn.id,
@@ -108,10 +108,10 @@ Called when a message is received:
 ```typescript
 {
   pattern: '/ws/chat',
-  
+
   onMessage: (conn, data) => {
     // data is automatically parsed JSON
-    
+
     switch (data.type) {
       case 'chat':
         conn.broadcast({
@@ -121,7 +121,7 @@ Called when a message is received:
           timestamp: Date.now()
         }, { includeSelf: true })
         break
-        
+
       case 'typing':
         conn.broadcast({
           type: 'typing',
@@ -140,10 +140,10 @@ Called when connection closes:
 ```typescript
 {
   pattern: '/ws/chat',
-  
+
   onClose: (conn, code, reason) => {
     console.log(`Connection ${conn.id} closed:`, code, reason)
-    
+
     // Notify other users
     conn.broadcast({
       type: 'user-left',
@@ -160,10 +160,10 @@ Called on errors:
 ```typescript
 {
   pattern: '/ws/chat',
-  
+
   onError: (conn, error) => {
     console.error('WebSocket error:', error)
-    
+
     // Handle specific errors
     if (error.message.includes('timeout')) {
       conn.close(1000, 'Timeout')
@@ -179,36 +179,36 @@ Group connections into rooms for targeted broadcasting:
 ```typescript
 {
   pattern: '/ws/chat',
-  
+
   onMessage: (conn, data) => {
     switch (data.type) {
       case 'join-room':
         // Join a room
         conn.joinRoom(data.room)
-        
+
         // Notify room members
         conn.broadcast({
           type: 'user-joined',
           username: data.username,
           room: data.room
-        }, { 
+        }, {
           rooms: [data.room],
           includeSelf: false
         })
         break
-        
+
       case 'leave-room':
         // Leave a room
         conn.leaveRoom(data.room)
         break
-        
+
       case 'message':
         // Broadcast to specific room
         conn.broadcast({
           type: 'chat-message',
           from: data.username,
           text: data.text
-        }, { 
+        }, {
           rooms: [data.room],
           includeSelf: true
         })
@@ -222,15 +222,15 @@ Client usage:
 
 ```typescript
 // Join room
-ws.send(JSON.stringify({ 
-  type: 'join-room', 
+ws.send(JSON.stringify({
+  type: 'join-room',
   room: 'general',
   username: 'Alice'
 }))
 
 // Send to room
-ws.send(JSON.stringify({ 
-  type: 'message', 
+ws.send(JSON.stringify({
+  type: 'message',
   room: 'general',
   username: 'Alice',
   text: 'Hello everyone!'
@@ -244,41 +244,41 @@ Authenticate connections before accepting:
 ```typescript
 {
   pattern: '/ws/private',
-  
+
   authenticate: async (req) => {
     // Get token from query params
     const url = new URL(req.url!, 'ws://localhost')
     const token = url.searchParams.get('token')
-    
+
     if (!token) {
-      return { 
-        success: false, 
-        code: 4001, 
-        reason: 'No token provided' 
+      return {
+        success: false,
+        code: 4001,
+        reason: 'No token provided'
       }
     }
-    
+
     try {
       const user = await verifyToken(token)
-      return { 
-        success: true, 
+      return {
+        success: true,
         data: { user }  // Stored in conn.authData
       }
     } catch (err) {
-      return { 
-        success: false, 
-        code: 4002, 
-        reason: 'Invalid token' 
+      return {
+        success: false,
+        code: 4002,
+        reason: 'Invalid token'
       }
     }
   },
-  
+
   onConnect: (conn) => {
     // Access authenticated user data
     const user = conn.authData.user
-    conn.send({ 
-      type: 'authenticated', 
-      user 
+    conn.send({
+      type: 'authenticated',
+      user
     })
   }
 }
@@ -299,7 +299,7 @@ Keep connections alive with automatic ping/pong:
 {
   pattern: '/ws/chat',
   heartbeat: 30000,  // 30 seconds
-  
+
   onConnect: (conn) => {
     // Heartbeat automatically starts
     console.log('Heartbeat interval:', 30000)
@@ -355,11 +355,11 @@ conn.broadcast(data, { includeSelf: false })
 ```typescript
 {
   pattern: '/ws/chat',
-  
+
   onConnect: (conn) => {
     conn.send({ type: 'connected', id: conn.id })
   },
-  
+
   onMessage: (conn, data) => {
     switch (data.type) {
       case 'join':
@@ -369,7 +369,7 @@ conn.broadcast(data, { includeSelf: false })
           username: data.username
         }, { rooms: ['chat'] })
         break
-        
+
       case 'message':
         conn.broadcast({
           type: 'chat-message',
@@ -389,12 +389,12 @@ conn.broadcast(data, { includeSelf: false })
 {
   pattern: '/ws/game',
   heartbeat: 10000,
-  
+
   onConnect: (conn) => {
     conn.joinRoom('lobby')
     conn.send({ type: 'joined-lobby' })
   },
-  
+
   onMessage: (conn, data) => {
     switch (data.type) {
       case 'create-game':
@@ -402,7 +402,7 @@ conn.broadcast(data, { includeSelf: false })
         conn.joinRoom(gameId)
         conn.send({ type: 'game-created', gameId })
         break
-        
+
       case 'join-game':
         conn.joinRoom(data.gameId)
         conn.broadcast({
@@ -410,7 +410,7 @@ conn.broadcast(data, { includeSelf: false })
           playerId: conn.id
         }, { rooms: [data.gameId] })
         break
-        
+
       case 'game-action':
         conn.broadcast({
           type: 'game-update',
@@ -431,23 +431,23 @@ interface IWebSocketConnection {
   rooms: Set<string>            // Joined rooms
   authData: any                 // From authenticate()
   req: IncomingMessage          // Original HTTP request
-  
+
   send(data: any): void         // Send to this connection
-  
+
   broadcast(                    // Broadcast to others
-    data: any, 
+    data: any,
     options?: {
       rooms?: string[]
       includeSelf?: boolean
     }
   ): void
-  
+
   joinRoom(room: string): void  // Join a room
   leaveRoom(room: string): void // Leave a room
-  
+
   ping(): void                  // Send ping
   pong(): void                  // Send pong
-  
+
   close(code?: number, reason?: string): void  // Close connection
 }
 ```
@@ -494,7 +494,7 @@ onError: (conn, error) => {
 onClose: (conn, code, reason) => {
   // Clean up resources
   removeUserFromActiveList(conn.id)
-  
+
   // Notify others
   conn.broadcast({ type: 'user-left', userId: conn.id })
 }

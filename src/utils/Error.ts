@@ -1,16 +1,16 @@
-import { ApiWsRestFsErrorType, IApiWsRestFsError } from "src/models/error.model";
+import { UniversalApiErrorType, IUniversalApiError } from "src/models/error.model";
 import { Constants } from "./constants";
 
-export class ApiWsRestFsError extends Error implements IApiWsRestFsError {
-	private type: ApiWsRestFsErrorType;
+export class UniversalApiError extends Error implements IUniversalApiError {
+	private type: UniversalApiErrorType;
 	private path: string;
 	private code: number = Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR;
 	private extra: any;
 
 
-    constructor(e: string, type: ApiWsRestFsErrorType, path: string, code?: number, extra?: any);
-    constructor(e: Error, type: ApiWsRestFsErrorType, path: string, code?: number, extra?: any);
-    constructor(e: string | Error, type: ApiWsRestFsErrorType, path: string, code?: number, extra?: any) {
+    constructor(e: string, type: UniversalApiErrorType, path: string, code?: number, extra?: any);
+    constructor(e: Error, type: UniversalApiErrorType, path: string, code?: number, extra?: any);
+    constructor(e: string | Error, type: UniversalApiErrorType, path: string, code?: number, extra?: any) {
         if (typeof e === "string") {
             super(e);
         } else {
@@ -23,7 +23,7 @@ export class ApiWsRestFsError extends Error implements IApiWsRestFsError {
 		!!extra && (this.extra = extra);
     }
 
-    getType(): ApiWsRestFsErrorType {
+    getType(): UniversalApiErrorType {
         return this.type;
 	}
 
@@ -43,7 +43,7 @@ export class ApiWsRestFsError extends Error implements IApiWsRestFsError {
 		this.path = path;
 	}
 
-	setType(type: ApiWsRestFsErrorType) {
+	setType(type: UniversalApiErrorType) {
 		this.type = type;
 	}
 }

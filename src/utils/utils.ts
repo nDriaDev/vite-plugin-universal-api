@@ -1,7 +1,7 @@
 import { createReadStream, createWriteStream, PathLike } from "node:fs";
 import { mkdir, readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { IncomingMessage, ServerResponse } from "node:http";
-import { ApiWsRestFsDataResponse, ApiRestFsErrorHandleFunction, ApiRestFsHandler, ApiRestFsMiddlewareFunction, ApiWsRestFsOptions, ApiWsRestFsOptionsRequired, APiWsRestFsParser, ApiWsRestFsParserFunction, ApiWsRestFsRequest, ApiWsHandler } from "src/models/index.model";
+import { ApiWsRestFsDataResponse, UniversalApiErrorMiddleware, UniversalApiRestFsHandler, UniversalApiMiddleware, UniversalApiOptions, UniversalApiOptionsRequired, UniversalApiParser, UniversalApiParserFunction, UniversalApiRequest, UniversalApiWsHandler } from "src/models/index.model";
 import { ResolvedConfig } from "vite";
 import { AntPathMatcher } from "./AntPathMatcher";
 import { join, parse as parsePath } from "node:path";
@@ -9,7 +9,7 @@ import { parse, URLSearchParams } from "node:url";
 import { StringDecoder } from "node:string_decoder";
 import { MimeType, MimeTypeExt } from "./MimeType";
 import { Constants } from "./constants";
-import { ApiWsRestFsError } from "./Error";
+import { UniversalApiError } from "./Error";
 import { ILogger } from "src/models/logger.model";
 import { createHash } from "node:crypto";
 
@@ -20,7 +20,7 @@ function patchWalkPath(target: any, path: string) {
     for (let i = 0; i < segments.length - 1; i++) {
         const key = segments[i];
 		if (!(key in current)) {
-			throw new ApiWsRestFsError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+			throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 		}
         current = current[key];
     }
@@ -49,7 +49,7 @@ export const Utils = {
 				resolve
 			}
 		},
-        initOptions(opts: ApiWsRestFsOptions | undefined, config: ResolvedConfig): ApiWsRestFsOptionsRequired {
+        initOptions(opts: UniversalApiOptions | undefined, config: ResolvedConfig): UniversalApiOptionsRequired {
             const fullFsDir = join(config.root, opts?.fsDir ?? "");
             const endpointPrefix = opts?.endpointPrefix
                 ? Array.isArray(opts.endpointPrefix) && opts.endpointPrefix.length > 0
@@ -260,13 +260,13 @@ export const Utils = {
 			} else {
 				// INFO RFC 6092 standard (JSON Patch)
 				if (!Array.isArray(patch)) {
-					throw new ApiWsRestFsError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+					throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 				}
 				result = Utils.plugin.cloneData(data);
 				patch.forEach(operation => {
 					const { op, path, value, from } = operation;
 					if (!op || !path) {
-						throw new ApiWsRestFsError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+						throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 					}
 					switch (op) {
 						case 'add': {
@@ -285,7 +285,7 @@ export const Utils = {
 								parent.splice(parseInt(key), 1);
 							} else {
 								if (!(key in parent)){
-									throw new ApiWsRestFsError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+									throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 								};
 								delete parent[key];
 							}
@@ -294,7 +294,7 @@ export const Utils = {
 						case 'replace': {
 							const { parent, key } = patchWalkPath(result, path);
 							if (!(key in parent)){
-								throw new ApiWsRestFsError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+								throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 							};
 							parent[key] = value;
 							break;
@@ -328,7 +328,7 @@ export const Utils = {
 							break;
 						}
 						default:
-							throw new ApiWsRestFsError(`PATCH operation not supported: ${op}`, "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+							throw new UniversalApiError(`PATCH operation not supported: ${op}`, "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 					}
 				})
 			}
@@ -396,22 +396,22 @@ export const Utils = {
             })
             return promise;
 		},
-		createRequest(req: IncomingMessage): ApiWsRestFsRequest {
-			const request: ApiWsRestFsRequest = req as ApiWsRestFsRequest;
+		createRequest(req: IncomingMessage): UniversalApiRequest {
+			const request: UniversalApiRequest = req as UniversalApiRequest;
 			request.body = null;
 			request.files = null;
 			request.params = null;
 			request.query = new URLSearchParams();
 			return request;
 		},
-		async parseRequest(request: ApiWsRestFsRequest, res: ServerResponse, fullUrl: URL, parserRequest: APiWsRestFsParser, logger: ILogger) {
+		async parseRequest(request: UniversalApiRequest, res: ServerResponse, fullUrl: URL, parserRequest: UniversalApiParser, logger: ILogger) {
 			try {
 				if (parserRequest) {
 					logger.debug("parseRequest: START");
 					if (typeof parserRequest === "object") {
 						const { promise, reject, resolve } = Utils.plugin.promiseWithResolver<any>();
 						const next = (error?: any) => resolve(error);
-						let parserFunc: ApiWsRestFsParserFunction[] = [];
+						let parserFunc: UniversalApiParserFunction[] = [];
 						if (!Array.isArray(parserRequest.parser)) {
 							parserFunc.push(parserRequest.parser);
 						} else {
@@ -426,7 +426,7 @@ export const Utils = {
 					} else {
 						const { query } = parse(request.url!, true);
 						let body: any = null,
-							files: ApiWsRestFsRequest["files"] = null;
+							files: UniversalApiRequest["files"] = null;
 						const mergedChunk = await this.mergeBodyChunk(request);
 						const contentType = request.headers["content-type"];
 						if (mergedChunk !== null) {
@@ -523,21 +523,21 @@ export const Utils = {
 				}
 			} catch (error: any) {
 				logger.debug("parseRequest: ERROR - ", error);
-				throw new ApiWsRestFsError("Error parsing request", "ERROR", fullUrl.pathname);
+				throw new UniversalApiError("Error parsing request", "ERROR", fullUrl.pathname);
 			} finally {
 				!!parserRequest && logger.debug("parseRequest: END");
 			}
         },
         MiddlewaresChain() {
-            const middlewares: ApiRestFsMiddlewareFunction[] = [];
-            const errorMiddlewares: ApiRestFsErrorHandleFunction[] = [];
+            const middlewares: UniversalApiMiddleware[] = [];
+            const errorMiddlewares: UniversalApiErrorMiddleware[] = [];
 
-            function use(m: ApiRestFsMiddlewareFunction[], me: ApiRestFsErrorHandleFunction[]) {
+            function use(m: UniversalApiMiddleware[], me: UniversalApiErrorMiddleware[]) {
 				middlewares.push(...m.filter(m => m !== null));
 				errorMiddlewares.push(...me.filter(me => me !== null));
 			}
 
-			async function handle(req: ApiWsRestFsRequest, res: ServerResponse, error?: any) {
+			async function handle(req: UniversalApiRequest, res: ServerResponse, error?: any) {
 				let mIdx = 0,
 					emIdx = 0,
 					lastError: any = null;
@@ -569,11 +569,11 @@ export const Utils = {
 						throw lastError;
 					}
 				} catch (finalError: any) {
-					throw new ApiWsRestFsError(finalError, "ERROR_MIDDLEWARE", "", Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR);
+					throw new UniversalApiError(finalError, "ERROR_MIDDLEWARE", "", Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR);
 				}
 			}
 
-			async function handleError(req: ApiWsRestFsRequest, res: ServerResponse, error: any, errorMiddlewares: ApiRestFsErrorHandleFunction[]) {
+			async function handleError(req: UniversalApiRequest, res: ServerResponse, error: any, errorMiddlewares: UniversalApiErrorMiddleware[]) {
 				use([], errorMiddlewares);
 				await handle(req, res, error);
 			}
@@ -584,13 +584,13 @@ export const Utils = {
                 use
             };
 		},
-		hasPaginationOrFilters(method: ApiWsRestFsRequest["method"], paginationPlugin: ApiWsRestFsOptionsRequired["pagination"], filterPlugin: ApiWsRestFsOptionsRequired["filters"], paginationHandler: ApiRestFsHandler["pagination"], filtersHandler: ApiRestFsHandler["filters"]) {
+		hasPaginationOrFilters(method: UniversalApiRequest["method"], paginationPlugin: UniversalApiOptionsRequired["pagination"], filterPlugin: UniversalApiOptionsRequired["filters"], paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"]) {
 			return (!!paginationHandler && paginationHandler !== "none")
 				|| (!!filtersHandler && filtersHandler !== null)
 				|| (paginationPlugin !== null && (method! in paginationPlugin || "ALL" in paginationPlugin))
 				|| (filterPlugin !== null && (method! in filterPlugin || "ALL" in filterPlugin))
 		},
-        getPaginationAndFilters(request: ApiWsRestFsRequest, paginationHandler: ApiRestFsHandler["pagination"], filtersHandler: ApiRestFsHandler["filters"], paginationPlugin: ApiWsRestFsOptions["pagination"], filtersPlugin: ApiWsRestFsOptions["filters"]): { pagination: null | { limit: null | number, skip: null | number, sort: null | string, order: null | string }, filters: null | { key: string, value: any, comparison: string, regexFlags?: string }[] } {
+        getPaginationAndFilters(request: UniversalApiRequest, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"]): { pagination: null | { limit: null | number, skip: null | number, sort: null | string, order: null | string }, filters: null | { key: string, value: any, comparison: string, regexFlags?: string }[] } {
             const result: { pagination: null | { limit: null | number, skip: null | number, sort: null | string, order: null | string }, filters: null | { key: string, value: any, comparison: string, regexFlags?: string }[] } = {
                 pagination: null,
 				filters: null
@@ -897,7 +897,7 @@ export const Utils = {
             }
             return result;
 		},
-		applyPaginationAndFilters(request: ApiWsRestFsRequest, paginationHandler: ApiRestFsHandler["pagination"], filtersHandler: ApiRestFsHandler["filters"], paginationPlugin: ApiWsRestFsOptions["pagination"], filtersPlugin: ApiWsRestFsOptions["filters"], dataFile: { originalData: any, data: any, mimeType: string, total: number}) {
+		applyPaginationAndFilters(request: UniversalApiRequest, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"], dataFile: { originalData: any, data: any, mimeType: string, total: number}) {
 			const data = JSON.parse(dataFile.data);
 			dataFile.originalData = JSON.parse(dataFile.data);
 			dataFile.data = data;
@@ -963,7 +963,7 @@ export const Utils = {
 				if (pagination !== null && Array.isArray(dataFile.data)) {
 					if (pagination.sort !== null && pagination.order !== null) {
 						if (!["ASC", "DESC", "1", "-1", "true", "false"].includes(pagination.order)) {
-							throw new ApiWsRestFsError("Error parsing pagination request", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+							throw new UniversalApiError("Error parsing pagination request", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 						}
 						dataFile.data = dataFile.data.sort((a: any, b: any) => {
 							return ["ASC", "1", "true"].includes(pagination.order!)
@@ -985,7 +985,7 @@ export const Utils = {
 			}
 			dataFile.total = Array.isArray(dataFile.data) ? dataFile.data.length : dataFile.data === null ? 0 : 1;
 		},
-        getCleanBody(requestMethod: string | undefined, body: any, paginationHandler: ApiRestFsHandler["pagination"], filtersHandler: ApiRestFsHandler["filters"], paginationPlugin: ApiWsRestFsOptions["pagination"], filtersPlugin: ApiWsRestFsOptions["filters"]): any {
+        getCleanBody(requestMethod: string | undefined, body: any, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"]): any {
             // INFO This method is only used when the request body is present and is of type JSON.
 			if (Array.isArray(body)) {
                 let newBody: any = [];
@@ -1165,7 +1165,7 @@ export const Utils = {
 					logger.debug(`settingResponse: errorMiddlewares founded.`);
 					const chain = Utils.request.MiddlewaresChain();
 					try {
-						await chain.handleError(responseData.req as ApiWsRestFsRequest, res, responseData.error, responseData.errorMiddlewares);
+						await chain.handleError(responseData.req as UniversalApiRequest, res, responseData.error, responseData.errorMiddlewares);
 						return Promise.resolve(null);
 					} catch (error: any) {
 						logger.error(`settingResponse: ERROR - failed to evalute errorMiddlewares. Original error`, error);
@@ -1198,7 +1198,7 @@ export const Utils = {
 								status: Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR,
 								data: "Error parsing body response",
 								isError: true,
-								error: new ApiWsRestFsError(error as Error, "ERROR", responseData.error?.getPath() ?? "", Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR),
+								error: new UniversalApiError(error as Error, "ERROR", responseData.error?.getPath() ?? "", Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR),
 							}
 						}
 					}
@@ -1318,7 +1318,7 @@ export const Utils = {
 			}
 			return null;
 		},
-		handshake(request: IncomingMessage, clientKey: string, logger: ILogger, perMessageDeflate?: ApiWsHandler["perMessageDeflate"], subprotocols?: string[]): { headers: string, deflateOptions: Record<string, boolean | number> | null, subprotocol?: string } {
+		handshake(request: IncomingMessage, clientKey: string, logger: ILogger, perMessageDeflate?: UniversalApiWsHandler["perMessageDeflate"], subprotocols?: string[]): { headers: string, deflateOptions: Record<string, boolean | number> | null, subprotocol?: string } {
 			logger.debug("handshake: START");
 			const clientExtensions = this.detectClientExtensions(request);
 			let deflateOptions: ReturnType<typeof this.detectClientDeflateOptions> = null;

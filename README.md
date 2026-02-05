@@ -1,16 +1,16 @@
 <div align="center">
-<a href="https://vite-plugin-ws-rest-fs-api.ndria.dev/">
-    <img src="https://raw.githubusercontent.com/nDriaDev/vite-plugin-ws-rest-fs-api/main/resources/img/logo_hd.png" alt="Go to web site">
+<a href="https://vite-plugin-universal-api.ndria.dev/">
+    <img src="https://raw.githubusercontent.com/nDriaDev/vite-plugin-universal-api/main/resources/img/logo_hd.png" alt="Go to web site">
 </a>
 <br>
 
-# vite-plugin-ws-rest-fs-api
+# vite-plugin-universal-api
 
 ### Seamless Mock APIs, Accelerate Your Development Journey
 
-[![npm version](https://img.shields.io/npm/v/%40ndriadev/vite-plugin-ws-rest-fs-api?color=orange&style=for-the-badge)](https://www.npmjs.com/package/%40ndriadev/vite-plugin-ws-rest-fs-api)
-![npm bundle size](https://img.shields.io/bundlephobia/minzip/%40ndriadev%2Fvite-plugin-ws-rest-fs-api?style=for-the-badge&label=SIZE&color=yellow)
-[![npm downloads](https://img.shields.io/npm/dt/%40ndriadev/vite-plugin-ws-rest-fs-api?label=DOWNLOADS&style=for-the-badge&color=red)](https://www.npmjs.com/package/%40ndriadev/vite-plugin-ws-rest-fs-api)
+[![npm version](https://img.shields.io/npm/v/%40ndriadev/vite-plugin-universal-api?color=orange&style=for-the-badge)](https://www.npmjs.com/package/%40ndriadev/vite-plugin-universal-api)
+![npm bundle size](https://img.shields.io/bundlephobia/minzip/%40ndriadev%2Fvite-plugin-universal-api?style=for-the-badge&label=SIZE&color=yellow)
+[![npm downloads](https://img.shields.io/npm/dt/%40ndriadev/vite-plugin-universal-api?label=DOWNLOADS&style=for-the-badge&color=red)](https://www.npmjs.com/package/%40ndriadev/vite-plugin-universal-api)
 [![License: MIT](https://img.shields.io/badge/LICENSE-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 ![Statements](https://img.shields.io/badge/statements-100%25-brightgreen.svg?style=for-the-badge)
@@ -58,7 +58,7 @@
 
 ## 🎯 Overview
 
-**vite-plugin-ws-rest-fs-api** is a comprehensive Vite plugin that transforms your development server into a powerful mock backend. It provides three complementary approaches to handle API requests:
+**vite-plugin-universal-api** is a comprehensive Vite plugin that transforms your development server into a powerful mock backend. It provides three complementary approaches to handle API requests:
 
 1. **📁 File-System Based API** - Automatically serve mock data from your file system
 2. **🔄 REST API Handlers** - Define custom programmatic handlers for dynamic responses
@@ -117,13 +117,13 @@ Perfect for frontend developers who need to:
 
 ```bash
 # pnpm (recommended)
-pnpm add -D @ndriadev/vite-plugin-ws-rest-fs-api
+pnpm add -D @ndriadev/vite-plugin-universal-api
 
 # npm
-npm install -D @ndriadev/vite-plugin-ws-rest-fs-api
+npm install -D @ndriadev/vite-plugin-universal-api
 
 # yarn
-yarn add -D @ndriadev/vite-plugin-ws-rest-fs-api
+yarn add -D @ndriadev/vite-plugin-universal-api
 ```
 
 ### Requirements
@@ -140,7 +140,7 @@ yarn add -D @ndriadev/vite-plugin-ws-rest-fs-api
 ```typescript
 // vite.config.ts
 import { defineConfig } from 'vite';
-import mockApi from '@ndriadev/vite-plugin-ws-rest-fs-api';
+import mockApi from '@ndriadev/vite-plugin-universal-api';
 
 export default defineConfig({
   plugins: [
@@ -175,7 +175,7 @@ curl http://localhost:5173/api/users
 ### Basic Options
 
 ```typescript
-interface ApiWsRestFsOptions {
+interface UniversalApiOptions {
   /**
    * Disable the entire plugin
    * @default false
@@ -300,7 +300,7 @@ interface RestHandler {
   /**
    * Handler function or 'FS' for file-system routing
    */
-  handle: 'FS' | ((req: ApiWsRestFsRequest, res: ServerResponse) => void | Promise<void>);
+  handle: 'FS' | ((req: UniversalApiRequest, res: ServerResponse) => void | Promise<void>);
 
   /**
    * Disable this specific handler
@@ -317,7 +317,7 @@ interface RestHandler {
    * For 'FS' handlers: function called before reading the file
    * Can modify path, check permissions, etc.
    */
-  preHandle?: (req: ApiWsRestFsRequest, res: ServerResponse) => {
+  preHandle?: (req: UniversalApiRequest, res: ServerResponse) => {
     continueHandle: boolean;
     path?: string;
   } | Promise<{...}>;
@@ -326,7 +326,7 @@ interface RestHandler {
    * For 'FS' handlers: function called after reading the file
    * Can transform data, add headers, etc.
    */
-  postHandle?: (req: ApiWsRestFsRequest, res: ServerResponse, data: any) => {
+  postHandle?: (req: UniversalApiRequest, res: ServerResponse, data: any) => {
     continueHandle: boolean;
     data?: any;
   } | Promise<{...}>;
@@ -1171,12 +1171,12 @@ handlers: [
 
 ## 📚 API Reference
 
-### Request Object (ApiWsRestFsRequest)
+### Request Object (UniversalApiRequest)
 
 Extended `IncomingMessage` with additional properties:
 
 ```typescript
-interface ApiWsRestFsRequest extends IncomingMessage {
+interface UniversalApiRequest extends IncomingMessage {
   /** Parsed request body (JSON, form data, etc.) */
   body: any;
 
@@ -1554,7 +1554,7 @@ Response sent
 
 ```typescript
 type MiddlewareFunction = (
-  req: ApiWsRestFsRequest,
+  req: UniversalApiRequest,
   res: ServerResponse,
   next: () => void
 ) => void | Promise<void>;
@@ -1573,7 +1573,7 @@ Example use cases:
 ```typescript
 type ErrorHandlerFunction = (
   err: any,
-  req: ApiWsRestFsRequest | IncomingMessage,
+  req: UniversalApiRequest | IncomingMessage,
   res: ServerResponse,
   next: (err?: any) => void
 ) => void | Promise<void>;
@@ -2070,8 +2070,8 @@ This will log:
 
 ## 📞 Support
 
-- **Issues:** [GitHub Issues](https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/discussions)
+- **Issues:** [GitHub Issues](https://github.com/nDriaDev/vite-plugin-universal-api/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/nDriaDev/vite-plugin-universal-api/discussions)
 - **Email:** info@ndria.dev
 
 ---
@@ -2081,6 +2081,6 @@ This will log:
 <div align="center">
 
 
-If you find this plugin useful, please consider giving it a ⭐ on [GitHub](https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api)!
+If you find this plugin useful, please consider giving it a ⭐ on [GitHub](https://github.com/nDriaDev/vite-plugin-universal-api)!
 
 </div>

@@ -7,24 +7,24 @@ Real-time chat application with rooms.
 ```typescript
 // vite.config.ts
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import mockApi from '@ndriadev/vite-plugin-universal-api'
 
 export default defineConfig({
   plugins: [
     mockApi({
       endpointPrefix: '/api',
       enableWs: true,
-      
+
       wsHandlers: [
         {
           pattern: '/ws/chat',
           heartbeat: 30000,
-          
+
           onConnect: (conn) => {
             console.log('Client connected:', conn.id)
             conn.send({ type: 'connected', id: conn.id })
           },
-          
+
           onMessage: (conn, data) => {
             switch (data.type) {
               case 'join':
@@ -33,24 +33,24 @@ export default defineConfig({
                   type: 'user-joined',
                   username: data.username,
                   room: data.room || 'general'
-                }, { 
+                }, {
                   rooms: [data.room || 'general'],
                   includeSelf: false
                 })
                 break
-                
+
               case 'message':
                 conn.broadcast({
                   type: 'chat-message',
                   username: data.username,
                   message: data.message,
                   timestamp: Date.now()
-                }, { 
+                }, {
                   rooms: [data.room || 'general'],
                   includeSelf: true
                 })
                 break
-                
+
               case 'leave':
                 conn.leaveRoom(data.room || 'general')
                 conn.broadcast({
@@ -61,7 +61,7 @@ export default defineConfig({
                 break
             }
           },
-          
+
           onClose: (conn) => {
             console.log('Client disconnected:', conn.id)
           }
@@ -81,28 +81,28 @@ function Chat() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const ws = useRef(null)
-  
+
   useEffect(() => {
     ws.current = new WebSocket('ws://localhost:5173/api/ws/chat')
-    
+
     ws.current.onopen = () => {
-      ws.current.send(JSON.stringify({ 
-        type: 'join', 
+      ws.current.send(JSON.stringify({
+        type: 'join',
         username: 'User',
         room: 'general'
       }))
     }
-    
+
     ws.current.onmessage = (event) => {
       const data = JSON.parse(event.data)
       if (data.type === 'chat-message') {
         setMessages(prev => [...prev, data])
       }
     }
-    
+
     return () => ws.current.close()
   }, [])
-  
+
   const sendMessage = () => {
     if (input.trim()) {
       ws.current.send(JSON.stringify({
@@ -114,7 +114,7 @@ function Chat() {
       setInput('')
     }
   }
-  
+
   return (
     <div>
       <div>
@@ -124,8 +124,8 @@ function Chat() {
           </div>
         ))}
       </div>
-      <input 
-        value={input} 
+      <input
+        value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
       />

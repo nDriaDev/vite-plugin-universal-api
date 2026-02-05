@@ -18,14 +18,14 @@ Pagination and filtering work **only** with:
 
 ```typescript
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import mockApi from '@ndriadev/vite-plugin-universal-api'
 
 export default defineConfig({
   plugins: [
     mockApi({
       endpointPrefix: '/api',
       fsDir: 'mock',
-      
+
       pagination: {
         GET: {
           type: 'query-param',  // or 'body'
@@ -332,7 +332,7 @@ mockApi({
       order: 'order'
     }
   },
-  
+
   filters: {
     GET: {
       type: 'query-param',
@@ -370,13 +370,13 @@ mockApi({
       skip: 'skip'
     }
   },
-  
+
   handlers: [
     {
       pattern: '/users',
       method: 'GET',
       handle: 'FS',
-      
+
       // Override for this handler
       pagination: {
         type: 'query-param',
@@ -385,7 +385,7 @@ mockApi({
         sort: 'orderBy',
         order: 'direction'
       },
-      
+
       filters: {
         type: 'query-param',
         filters: [

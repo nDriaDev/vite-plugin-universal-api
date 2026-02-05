@@ -7,7 +7,7 @@ Dynamic REST API endpoints with custom logic.
 ```typescript
 // vite.config.ts
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-ws-rest-fs-api'
+import mockApi from '@ndriadev/vite-plugin-universal-api'
 
 // In-memory database
 const db = {
@@ -22,7 +22,7 @@ export default defineConfig({
   plugins: [
     mockApi({
       endpointPrefix: '/api',
-      
+
       handlers: [
         // GET all users
         {
@@ -33,25 +33,25 @@ export default defineConfig({
             res.end(JSON.stringify(db.users))
           }
         },
-        
+
         // GET single user
         {
           pattern: '/users/{id}',
           method: 'GET',
           handle: async (req, res) => {
             const user = db.users.find(u => u.id === parseInt(req.params.id))
-            
+
             if (!user) {
               res.writeHead(404, { 'Content-Type': 'application/json' })
               res.end(JSON.stringify({ error: 'User not found' }))
               return
             }
-            
+
             res.writeHead(200, { 'Content-Type': 'application/json' })
             res.end(JSON.stringify(user))
           }
         },
-        
+
         // POST create user
         {
           pattern: '/users',
@@ -61,27 +61,27 @@ export default defineConfig({
               id: db.nextId++,
               ...req.body
             }
-            
+
             db.users.push(newUser)
-            
+
             res.writeHead(201, { 'Content-Type': 'application/json' })
             res.end(JSON.stringify(newUser))
           }
         },
-        
+
         // DELETE user
         {
           pattern: '/users/{id}',
           method: 'DELETE',
           handle: async (req, res) => {
             const index = db.users.findIndex(u => u.id === parseInt(req.params.id))
-            
+
             if (index === -1) {
               res.writeHead(404)
               res.end()
               return
             }
-            
+
             db.users.splice(index, 1)
             res.writeHead(204)
             res.end()

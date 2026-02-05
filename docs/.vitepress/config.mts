@@ -10,7 +10,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
-	title: "vite-plugin-ws-rest-fs-api",
+	title: "vite-plugin-universal-api",
 	description: "Mock WebSocket, REST and File-based APIs for Vite",
 	base: "/",
 	buildEnd() {
@@ -102,8 +102,8 @@ export default defineConfig({
 			]
 		},
 		socialLinks: [
-			{ icon: 'github', link: 'https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api' },
-			{ icon: 'npm', link: 'https://www.npmjs.com/package/@ndriadev/vite-plugin-ws-rest-fs-api' },
+			{ icon: 'github', link: 'https://github.com/nDriaDev/vite-plugin-universal-api' },
+			{ icon: 'npm', link: 'https://www.npmjs.com/package/@ndriadev/vite-plugin-universal-api' },
 			{ icon: 'googlehome', link: 'https://ndria.dev' }
 		],
 		footer: {
@@ -117,7 +117,7 @@ export default defineConfig({
 	head: [
 		['link', { rel: 'icon', type: 'image/png', href: '/logo.png' }],
 		['meta', { property: 'og:type', content: 'website' }],
-		['meta', { property: 'og:title', content: 'vite-plugin-ws-rest-fs-api' }],
+		['meta', { property: 'og:title', content: 'vite-plugin-universal-api' }],
 		['meta', { property: 'og:description', content: 'Mock WebSocket, REST and File-based APIs for Vite' }],
 		['meta', { name: 'twitter:card', content: 'summary_large_image' }],
 	],

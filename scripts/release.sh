@@ -131,7 +131,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo -e "${YELLOW}You can manually publish later with: pnpm publish --access public${NC}"
         exit 1
     }
-    
+
     echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${GREEN}🎉 Release v$NEW_VERSION completed successfully!${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -139,8 +139,8 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo -e "${GREEN}✅ Git tag pushed to remote${NC}"
     echo -e "${GREEN}✅ Changelog updated${NC}"
     echo -e ""
-    echo -e "${BLUE}📦 npm: ${YELLOW}https://www.npmjs.com/package/@ndriadev/vite-plugin-ws-rest-fs-api${NC}"
-    echo -e "${BLUE}🏷️  Tag: ${YELLOW}https://github.com/nDriaDev/vite-plugin-ws-rest-fs-api/releases/tag/v$NEW_VERSION${NC}"
+    echo -e "${BLUE}📦 npm: ${YELLOW}https://www.npmjs.com/package/@ndriadev/vite-plugin-universal-api${NC}"
+    echo -e "${BLUE}🏷️  Tag: ${YELLOW}https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v$NEW_VERSION${NC}"
 else
     echo -e "\n${YELLOW}⚠️  Skipped npm publish${NC}"
     echo -e "${BLUE}Version bump and git tag have been pushed to remote.${NC}"
