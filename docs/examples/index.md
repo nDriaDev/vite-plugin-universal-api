@@ -27,11 +27,12 @@ Serve JSON files directly:
 
 ```typescript
 // vite.config.ts
-import mockApi from '@ndriadev/vite-plugin-universal-api'
+// import mockApi from '@ndriadev/vite-plugin-universal-api' //Default export
+import { universalApi } from '@ndriadev/vite-plugin-universal-api' // Named export
 
 export default {
   plugins: [
-    mockApi({
+    universalApi({
       endpointPrefix: '/api',
       fsDir: 'mock'
     })
@@ -52,7 +53,7 @@ export default {
 Custom endpoint with logic:
 
 ```typescript
-mockApi({
+universalApi({
   handlers: [
     {
       pattern: '/users/{id}',
@@ -72,7 +73,7 @@ mockApi({
 Real-time messaging:
 
 ```typescript
-mockApi({
+universalApi({
   enableWs: true,
   wsHandlers: [
     {
@@ -136,7 +137,7 @@ my-app/
 ### Development Workflow
 
 ```typescript
-mockApi({
+universalApi({
   endpointPrefix: '/api',
   fsDir: 'mock',
   logLevel: 'debug',           // See all requests
@@ -163,7 +164,7 @@ mockApi({
 ### Testing Edge Cases
 
 ```typescript
-mockApi({
+universalApi({
   handlers: [
     // Simulate errors
     {
@@ -202,7 +203,7 @@ mockApi({
 ### Prototyping New Features
 
 ```typescript
-mockApi({
+universalApi({
   fsDir: 'mock',
 
   handlers: [

@@ -70,11 +70,12 @@ Add the plugin to your `vite.config.ts`:
 
 ```typescript
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-universal-api'
+// import mockApi from '@ndriadev/vite-plugin-universal-api' //Default export
+import { universalApi } from '@ndriadev/vite-plugin-universal-api' // Named export
 
 export default defineConfig({
   plugins: [
-    mockApi({
+    universalApi({
       endpointPrefix: '/api',
       fsDir: 'mock'
     })

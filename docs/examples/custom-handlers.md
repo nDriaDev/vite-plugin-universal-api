@@ -7,7 +7,8 @@ Dynamic REST API endpoints with custom logic.
 ```typescript
 // vite.config.ts
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-universal-api'
+// import mockApi from '@ndriadev/vite-plugin-universal-api' //Default export
+import { universalApi } from '@ndriadev/vite-plugin-universal-api' // Named export
 
 // In-memory database
 const db = {
@@ -20,7 +21,7 @@ const db = {
 
 export default defineConfig({
   plugins: [
-    mockApi({
+    universalApi({
       endpointPrefix: '/api',
 
       handlers: [

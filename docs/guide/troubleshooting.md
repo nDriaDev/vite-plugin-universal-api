@@ -17,12 +17,12 @@ Common issues and solutions when using vite-plugin-universal-api.
 
 ```typescript
 // ❌ Bad - empty or invalid
-mockApi({
+universalApi({
   endpointPrefix: ''  // Won't work!
 })
 
 // ✅ Good
-mockApi({
+universalApi({
   endpointPrefix: '/api'
 })
 ```
@@ -31,12 +31,12 @@ mockApi({
 
 ```typescript
 // ❌ Plugin is disabled
-mockApi({
+universalApi({
   disable: true
 })
 
 // ✅ Plugin is enabled
-mockApi({
+universalApi({
   disable: false  // or omit it
 })
 ```
@@ -45,7 +45,7 @@ mockApi({
 
 ```typescript
 // Check directory exists
-mockApi({
+universalApi({
   fsDir: 'mock'  // Should point to ./mock directory
 })
 ```
@@ -69,7 +69,7 @@ ls -la mock/
 1. **Enable WebSocket**
 
 ```typescript
-mockApi({
+universalApi({
   enableWs: true,  // Must be true!
   wsHandlers: [...]
 })
@@ -138,7 +138,7 @@ fetch('/api/users', {
 2. **Verify parser is enabled**
 
 ```typescript
-mockApi({
+universalApi({
   parser: true  // Default, enables JSON parsing
 })
 ```
@@ -158,7 +158,7 @@ body: JSON.stringify({ name: 'John' })
 ```typescript
 import express from 'express'
 
-mockApi({
+universalApi({
   parser: {
     parser: [
       express.json(),
@@ -202,7 +202,7 @@ chmod 644 mock/users.json
 3. **Verify `fsDir` configuration**
 
 ```typescript
-mockApi({
+universalApi({
   fsDir: 'mock'  // Relative to project root
 })
 ```
@@ -234,7 +234,7 @@ mock/users       // ❌ Only if exact file exists
 1. **Add CORS middleware**
 
 ```typescript
-mockApi({
+universalApi({
   handlerMiddlewares: [
     async (req, res, next) => {
       res.setHeader('Access-Control-Allow-Origin', '*')
@@ -442,7 +442,7 @@ npm list @ndriadev/vite-plugin-universal-api
 
 2. **Enable debug logging**
 ```typescript
-mockApi({
+universalApi({
   logLevel: 'debug'  // See all internal logs
 })
 ```

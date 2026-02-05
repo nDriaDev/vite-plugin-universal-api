@@ -140,11 +140,12 @@ yarn add -D @ndriadev/vite-plugin-universal-api
 ```typescript
 // vite.config.ts
 import { defineConfig } from 'vite';
-import mockApi from '@ndriadev/vite-plugin-universal-api';
+// import mockApi from '@ndriadev/vite-plugin-universal-api' //Default export
+import { universalApi } from '@ndriadev/vite-plugin-universal-api' // Named export ;
 
 export default defineConfig({
   plugins: [
-    mockApi({
+    universalApi({
       endpointPrefix: '/api',
       fsDir: 'mock'
     })
@@ -567,7 +568,7 @@ project/
 // vite.config.ts
 export default defineConfig({
   plugins: [
-    mockApi({
+    universalApi({
       endpointPrefix: '/api',
       fsDir: 'mock',
       // Global pagination for GET requests
@@ -643,7 +644,7 @@ DELETE /api/users/123
 ```typescript
 export default defineConfig({
   plugins: [
-    mockApi({
+    universalApi({
       endpointPrefix: '/api',
       handlers: [
         {
@@ -724,7 +725,7 @@ handlers: [
 ```typescript
 export default defineConfig({
   plugins: [
-    mockApi({
+    universalApi({
       endpointPrefix: '/api',
       // Global middleware for all handlers
       handlerMiddlewares: [
@@ -792,7 +793,7 @@ export default defineConfig({
 ```typescript
 export default defineConfig({
   plugins: [
-    mockApi({
+    universalApi({
       endpointPrefix: '/api',
       enableWs: true,
       wsHandlers: [
@@ -1020,7 +1021,7 @@ const upload = multer();
 
 export default defineConfig({
   plugins: [
-    mockApi({
+    universalApi({
       endpointPrefix: '/api',
       parser: {
         // Use Express parsers
@@ -1886,7 +1887,7 @@ Each WebSocket handler must have a **unique pattern**. Duplicate patterns will c
 
 ```typescript
 // Enable debug logging
-mockApi({
+universalApi({
   logLevel: 'debug',
   // ...
 })
@@ -2036,7 +2037,7 @@ onMessage: (conn, msg) => {
 Enable maximum verbosity for troubleshooting:
 
 ```typescript
-mockApi({
+universalApi({
   logLevel: 'debug',
   // ... other options
 })

@@ -18,11 +18,12 @@ Pagination and filtering work **only** with:
 
 ```typescript
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-universal-api'
+// import mockApi from '@ndriadev/vite-plugin-universal-api' //Default export
+import { universalApi } from '@ndriadev/vite-plugin-universal-api' // Named export
 
 export default defineConfig({
   plugins: [
-    mockApi({
+    universalApi({
       endpointPrefix: '/api',
       fsDir: 'mock',
 
@@ -322,7 +323,7 @@ GET /api/users?search=john
 ## Combining Pagination & Filters
 
 ```typescript
-mockApi({
+universalApi({
   pagination: {
     GET: {
       type: 'query-param',
@@ -361,7 +362,7 @@ GET /api/users?status=active&minAge=18&limit=10&skip=0&sortBy=name&order=asc
 Override global config for specific handlers:
 
 ```typescript
-mockApi({
+universalApi({
   // Global config
   pagination: {
     GET: {

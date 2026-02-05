@@ -26,12 +26,13 @@ my-app/
 // vite.config.ts
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import mockApi from '@ndriadev/vite-plugin-universal-api'
+// import mockApi from '@ndriadev/vite-plugin-universal-api' //Default export
+import { universalApi } from '@ndriadev/vite-plugin-universal-api' // Named export
 
 export default defineConfig({
   plugins: [
     react(),
-    mockApi({
+    universalApi({
       endpointPrefix: '/api',
       fsDir: 'mock',
 

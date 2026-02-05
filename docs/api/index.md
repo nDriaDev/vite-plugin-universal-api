@@ -12,7 +12,7 @@ Complete reference for all configuration options available in vite-plugin-univer
 Disable the entire plugin.
 
 ```typescript
-mockApi({
+universalApi({
   disable: true // Plugin won't run
 })
 ```
@@ -25,7 +25,7 @@ mockApi({
 Logging verbosity level.
 
 ```typescript
-mockApi({
+universalApi({
   logLevel: 'debug' // Show all debug messages
 })
 ```
@@ -45,12 +45,12 @@ URL prefix(es) for API endpoints.
 
 ```typescript
 // Single prefix
-mockApi({
+universalApi({
   endpointPrefix: '/api'
 })
 
 // Multiple prefixes
-mockApi({
+universalApi({
   endpointPrefix: ['/api', '/mock', '/v1']
 })
 ```
@@ -67,12 +67,12 @@ If `endpointPrefix` is empty or invalid, the plugin will be automatically disabl
 Directory path for file-based mocking (relative to project root).
 
 ```typescript
-mockApi({
+universalApi({
   fsDir: 'mock' // Points to ./mock/ directory
 })
 
 // Disable file-based routing
-mockApi({
+universalApi({
   fsDir: null
 })
 ```
@@ -89,7 +89,7 @@ If the directory doesn't exist, file-based routing will be disabled automaticall
 Enable WebSocket support. When `true`, `wsHandlers` option becomes required.
 
 ```typescript
-mockApi({
+universalApi({
   enableWs: true,
   wsHandlers: [
     // At least one handler required
@@ -105,7 +105,7 @@ mockApi({
 Simulated response delay. Useful for testing loading states.
 
 ```typescript
-mockApi({
+universalApi({
   delay: 1000 // All responses delayed by 1 second
 })
 ```
@@ -113,7 +113,7 @@ mockApi({
 Can also be set per-handler:
 
 ```typescript
-mockApi({
+universalApi({
   delay: 500, // Global delay
   handlers: [
     {
@@ -136,7 +136,7 @@ mockApi({
 Timeout for long-running handlers. Returns 504 Gateway Timeout if exceeded.
 
 ```typescript
-mockApi({
+universalApi({
   gatewayTimeout: 60000 // 1 minute timeout
 })
 ```
@@ -150,12 +150,12 @@ Behavior for requests that don't match any handler pattern.
 
 ```typescript
 // Return 404 for unmatched requests
-mockApi({
+universalApi({
   noHandledRestFsRequestsAction: '404'
 })
 
 // Forward to next Vite middleware (e.g., serve static files)
-mockApi({
+universalApi({
   noHandledRestFsRequestsAction: 'forward'
 })
 ```
@@ -176,7 +176,7 @@ Request body parsing configuration.
 **Built-in parser (default):**
 
 ```typescript
-mockApi({
+universalApi({
   parser: true // Enables built-in JSON + form data parser
 })
 ```
@@ -184,7 +184,7 @@ mockApi({
 **Disable parsing:**
 
 ```typescript
-mockApi({
+universalApi({
   parser: false // No automatic parsing
 })
 ```
@@ -194,7 +194,7 @@ mockApi({
 ```typescript
 import express from 'express'
 
-mockApi({
+universalApi({
   parser: {
     // Use Express parsers
     parser: [
@@ -224,7 +224,7 @@ The parser is executed **only** for REST API requests, not for WebSocket message
 Global middleware executed before all handlers. Similar to Express middleware.
 
 ```typescript
-mockApi({
+universalApi({
   handlerMiddlewares: [
     // Logger
     async (req, res, next) => {
@@ -258,7 +258,7 @@ Middleware is executed **only** for handlers defined in the `handlers` array, **
 Error handling middleware. Called when an error occurs during request processing.
 
 ```typescript
-mockApi({
+universalApi({
   errorMiddlewares: [
     (err, req, res, next) => {
       console.error('API Error:', err)
@@ -289,7 +289,7 @@ mockApi({
 REST API handler configurations. See [REST Handlers](/api/rest-handlers) for detailed documentation.
 
 ```typescript
-mockApi({
+universalApi({
   handlers: [
     {
       pattern: '/users/{id}',
@@ -312,7 +312,7 @@ mockApi({
 WebSocket handler configurations. See [WebSocket Handlers](/api/websocket-handlers) for detailed documentation.
 
 ```typescript
-mockApi({
+universalApi({
   enableWs: true,
   wsHandlers: [
     {
@@ -335,7 +335,7 @@ mockApi({
 Global pagination configuration for file-based endpoints. Can be configured per HTTP method or for all methods.
 
 ```typescript
-mockApi({
+universalApi({
   pagination: {
     // Apply to all GET requests
     GET: {
@@ -389,7 +389,7 @@ Pagination works **only** with:
 Global filter configuration for file-based endpoints.
 
 ```typescript
-mockApi({
+universalApi({
   filters: {
     GET: {
       type: 'query-param',
@@ -440,11 +440,12 @@ Filters work **only** with:
 
 ```typescript
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-universal-api'
+// import mockApi from '@ndriadev/vite-plugin-universal-api' //Default export
+import { universalApi } from '@ndriadev/vite-plugin-universal-api' // Named export
 
 export default defineConfig({
   plugins: [
-    mockApi({
+    universalApi({
       // Basic options
       disable: false,
       logLevel: 'debug',

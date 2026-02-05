@@ -6,7 +6,8 @@ JWT-based authentication for REST and WebSocket.
 
 ```typescript
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-universal-api'
+// import mockApi from '@ndriadev/vite-plugin-universal-api' //Default export
+import { universalApi } from '@ndriadev/vite-plugin-universal-api' // Named export
 
 const users = [{ username: 'admin', password: 'admin123' }]
 const tokens = new Map()
@@ -27,7 +28,7 @@ function verifyToken(token) {
 
 export default defineConfig({
   plugins: [
-    mockApi({
+    universalApi({
       endpointPrefix: '/api',
 
       handlers: [

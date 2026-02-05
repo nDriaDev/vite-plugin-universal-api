@@ -6,13 +6,14 @@ Multiplayer game server with rooms and state management.
 
 ```typescript
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-universal-api'
+// import mockApi from '@ndriadev/vite-plugin-universal-api' //Default export
+import { universalApi } from '@ndriadev/vite-plugin-universal-api' // Named export
 
 const games = new Map()
 
 export default defineConfig({
   plugins: [
-    mockApi({
+    universalApi({
       enableWs: true,
       wsHandlers: [
         {

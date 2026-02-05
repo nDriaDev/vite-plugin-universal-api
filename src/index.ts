@@ -54,4 +54,5 @@ function plugin(opts?: UniversalApiOptions): Plugin {
 	}
 }
 
+export { plugin as universalApi };
 export default plugin;

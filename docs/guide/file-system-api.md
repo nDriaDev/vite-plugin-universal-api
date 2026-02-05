@@ -21,11 +21,12 @@ mock/
 ```typescript
 // vite.config.ts
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-universal-api'
+// import mockApi from '@ndriadev/vite-plugin-universal-api' //Default export
+import { universalApi } from '@ndriadev/vite-plugin-universal-api' // Named export
 
 export default defineConfig({
   plugins: [
-    mockApi({
+    universalApi({
       endpointPrefix: '/api',
       fsDir: 'mock'  // Points to ./mock directory
     })
@@ -155,7 +156,7 @@ Removes matching items from array.
 Enable pagination in configuration:
 
 ```typescript
-mockApi({
+universalApi({
   endpointPrefix: '/api',
   fsDir: 'mock',
   pagination: {
@@ -185,7 +186,7 @@ GET /api/users?limit=10&skip=20&sortBy=name&order=desc
 Enable filtering in configuration:
 
 ```typescript
-mockApi({
+universalApi({
   filters: {
     GET: {
       type: 'query-param',

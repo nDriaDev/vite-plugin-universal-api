@@ -24,7 +24,7 @@ When the `parser` option is enabled (default behavior):
 -   Uploaded files (multipart) are parsed if supported
 
 ``` ts
-mockApi({
+universalApi({
   endpointPrefix: '/api',
   parser: true
 })
@@ -37,7 +37,7 @@ mockApi({
 You can disable parsing entirely:
 
 ``` ts
-mockApi({
+universalApi({
   endpointPrefix: '/api',
   parser: false
 })
@@ -68,7 +68,7 @@ import multer from 'multer'
 
 const upload = multer()
 
-mockApi({
+universalApi({
   endpointPrefix: '/api',
   parser: {
     parser: [

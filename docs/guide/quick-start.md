@@ -21,11 +21,12 @@ Perfect for static mock data and quick prototyping.
 ```typescript
 // vite.config.ts
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-universal-api'
+// import mockApi from '@ndriadev/vite-plugin-universal-api' //Default export
+import { universalApi } from '@ndriadev/vite-plugin-universal-api' // Named export
 
 export default defineConfig({
   plugins: [
-    mockApi({
+    universalApi({
       endpointPrefix: '/api',
       fsDir: 'mock'
     })
@@ -80,7 +81,7 @@ async function fetchUsers() {
 Add pagination and filtering configuration:
 
 ```typescript
-mockApi({
+universalApi({
   endpointPrefix: '/api',
   fsDir: 'mock',
   pagination: {
@@ -123,7 +124,7 @@ For dynamic responses and custom logic.
 ### Basic Handler
 
 ```typescript
-mockApi({
+universalApi({
   endpointPrefix: '/api',
   handlers: [
     {
@@ -152,7 +153,7 @@ mockApi({
 ### Multiple HTTP Methods
 
 ```typescript
-mockApi({
+universalApi({
   handlers: [
     // GET: Fetch user
     {
@@ -228,7 +229,7 @@ const db = {
   users: []
 }
 
-mockApi({
+universalApi({
   // Global middleware runs before all handlers
   handlerMiddlewares: [
     // Logger
@@ -279,7 +280,7 @@ For real-time features like chat, notifications, live updates.
 ### Basic WebSocket Server
 
 ```typescript
-mockApi({
+universalApi({
   endpointPrefix: '/api',
   enableWs: true,
   wsHandlers: [
@@ -335,7 +336,7 @@ ws.onclose = () => {
 ```typescript
 const chatRooms = new Map()
 
-mockApi({
+universalApi({
   enableWs: true,
   wsHandlers: [
     {
@@ -386,7 +387,7 @@ mockApi({
 ### With Authentication
 
 ```typescript
-mockApi({
+universalApi({
   enableWs: true,
   wsHandlers: [
     {
@@ -449,7 +450,7 @@ const ws = new WebSocket(`ws://localhost:5173/api/ws/private?token=${token}`)
 You can use all three approaches together:
 
 ```typescript
-mockApi({
+universalApi({
   endpointPrefix: '/api',
   fsDir: 'mock',  // File-based API
 
@@ -492,7 +493,7 @@ Now your app has:
 ### Simulate Network Delay
 
 ```typescript
-mockApi({
+universalApi({
   delay: 1000, // All requests delayed by 1 second
   handlers: [
     {
@@ -511,7 +512,7 @@ mockApi({
 ### Debug Logging
 
 ```typescript
-mockApi({
+universalApi({
   logLevel: 'debug', // See all requests and responses
   endpointPrefix: '/api',
   fsDir: 'mock'
@@ -535,7 +536,7 @@ Now that you understand the basics:
 ```typescript
 const db = { users: [] }
 
-mockApi({
+universalApi({
   handlers: [
     // Create
     { pattern: '/users', method: 'POST', handle: (req, res) => {
@@ -590,7 +591,7 @@ mockApi({
 ### Error Handling
 
 ```typescript
-mockApi({
+universalApi({
   errorMiddlewares: [
     (err, req, res, next) => {
       console.error('Error:', err)

@@ -33,7 +33,7 @@ import mockApi from '@ndriadev/vite-plugin-universal-mock-api'
 
 export default defineConfig({
   plugins: [
-    mockApi({
+    universalApi({
       endpointPrefix: '/api',
       handlers: [
         {
@@ -570,7 +570,7 @@ You must implement them manually in your `postHandle` function if needed.
 **Middleware** runs for **all handlers** and has different purposes.
 
 ```typescript
-mockApi({
+universalApi({
   // Middleware: runs for ALL handlers
   handlerMiddlewares: [
     async (req, res, next) => {
