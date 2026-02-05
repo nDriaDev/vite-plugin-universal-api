@@ -8,7 +8,10 @@ export default defineBuildConfig({
     declaration: true,
     rollup: {
         emitCJS: true,
-        inlineDependencies: true,
+		inlineDependencies: true,
+		output: {
+			exports: "named"
+		},
 		esbuild: {
 			target: "node16",
             minify: true,
@@ -18,7 +21,7 @@ export default defineBuildConfig({
             treeShaking: true,
             ignoreAnnotations: true,
             legalComments: "none"
-        }
+		}
 	},
 	hooks: {
 		'build:done': async (ctx) => {
