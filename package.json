@@ -2,7 +2,7 @@
 	"name": "@ndriadev/vite-plugin-universal-api",
 	"description": "Plugin Mock WebSocket, REST and File-based APIs for Vite",
 	"private": false,
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"type": "module",
 	"files": [
 		"dist/",
