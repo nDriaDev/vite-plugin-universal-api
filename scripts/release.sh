@@ -54,35 +54,36 @@ echo -e "${BLUE}📦 Current version: ${YELLOW}$CURRENT_VERSION${NC}"
 # Run pre-release checks
 echo -e "\n${BLUE}🔍 Running pre-release checks...${NC}"
 
-echo -e "${BLUE}   1/5 Running linter...${NC}"
+echo -e "${BLUE}   1/4 Running linter...${NC}"
 pnpm run lint || {
     echo -e "${RED}❌ Linting failed${NC}"
     exit 1
 }
 
-echo -e "${BLUE}   2/5 Running type check...${NC}"
+echo -e "${BLUE}   2/4 Running type check...${NC}"
 pnpm run typecheck || {
     echo -e "${RED}❌ Type checking failed${NC}"
     exit 1
 }
 
-echo -e "${BLUE}   3/5 Running tests...${NC}"
+echo -e "${BLUE}   3/4 Running tests...${NC}"
 pnpm run test:run || {
     echo -e "${RED}❌ Tests failed${NC}"
     exit 1
 }
 
-echo -e "${BLUE}   4/5 Building package...${NC}"
+echo -e "${BLUE}   4/4 Building package...${NC}"
 pnpm run build || {
     echo -e "${RED}❌ Build failed${NC}"
     exit 1
 }
 
-echo -e "${BLUE}   5/5 Building documentation...${NC}"
-pnpm run docs:build || {
-    echo -e "${RED}❌ Documentation build failed${NC}"
-    exit 1
-}
+# DOCS generated from github action
+# echo -e "${BLUE}   5/5 Building documentation...${NC}"
+# pnpm run docs:build || {
+#     echo -e "${RED}❌ Documentation build failed${NC}"
+#     exit 1
+# }
 
 echo -e "${GREEN}✅ All pre-release checks passed!${NC}"
 
@@ -102,7 +103,7 @@ pnpm run changelog || {
 
 # Commit changes
 echo -e "\n${BLUE}💾 Committing changes...${NC}"
-git add package.json CHANGELOG.md docs/.vitepress/dist
+git add package.json CHANGELOG.md
 git commit -m "chore(release): v$NEW_VERSION" || {
     echo -e "${YELLOW}⚠️  Nothing to commit${NC}"
 }
