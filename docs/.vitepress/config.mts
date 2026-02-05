@@ -77,7 +77,6 @@ export default defineConfig({
 					text: 'API Reference',
 					items: [
 						{ text: 'Configuration Options', link: '/api/' },
-						{ text: 'Request Object', link: '/api/request' },
 						{ text: 'REST Handlers', link: '/api/rest-handlers' },
 						{ text: 'WebSocket Handlers', link: '/api/websocket-handlers' },
 						{ text: 'WebSocket Connection', link: '/api/websocket-connection' },
