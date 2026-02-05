@@ -1,6 +1,6 @@
 <div align="center">
 <a href="https://vite-plugin-universal-api.ndria.dev/">
-    <img src="https://raw.githubusercontent.com/nDriaDev/vite-plugin-universal-api/main/resources/img/logo_hd.png" alt="Go to web site">
+    <img src="https://raw.githubusercontent.com/nDriaDev/vite-plugin-universal-api/main/resources/img/logo.png" alt="Go to web site">
 </a>
 <br>
 
