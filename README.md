@@ -25,6 +25,8 @@
 [![Vitest](https://img.shields.io/badge/Vitest-6E9F18.svg?style=for-the-badge&logo=Vitest&logoColor=white)](https://vitest.dev/)
 [![ESLint](https://img.shields.io/badge/ESLint-4B32C3.svg?style=for-the-badge&logo=ESLint&logoColor=white)](https://eslint.org/)
 
+![Vite compatibility](https://registry.vite.dev/api/badges?package=@vitejs/plugin-vue&tool=vite)
+
 </div>
 
 ---
