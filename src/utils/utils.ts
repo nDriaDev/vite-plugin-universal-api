@@ -489,7 +489,7 @@ export const Utils = {
 												files = [];
 											}
 											files.push({
-												name,
+												name: filename,
 												content: data,
 												contentType: partContentType
 											});
