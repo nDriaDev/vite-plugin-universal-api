@@ -1,5 +1,12 @@
 ### [1.0.4](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v1.0.4) - 2026-02-09
 
+## [1.0.6](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v1.0.6) - 2026-03-12
+
+### Chores
+
+- update dependencies ([9009b39](https://github.com/nDriaDev/vite-plugin-universal-api/commit/9009b39))
+- update dependencies ([0899890](https://github.com/nDriaDev/vite-plugin-universal-api/commit/0899890))
+
 ## [1.0.5](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v1.0.5) - 2026-02-19
 
 ### Chores
