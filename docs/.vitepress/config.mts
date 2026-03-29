@@ -1,13 +1,32 @@
 /// <reference types="node" />
 
-import { defineConfig } from 'vitepress'
+import { DefaultTheme, defineConfig } from 'vitepress'
 import { readFileSync, existsSync, writeFileSync } from 'fs';
 import { join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import packageJson from '../../package.json' with { type: "json" };
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+const nav: DefaultTheme.NavItem[] = [
+	{ text: 'Home', link: '/' },
+	{ text: 'Guide', link: '/guide/getting-started' },
+	{ text: 'API Reference', link: '/api/' },
+	{ text: 'Examples', link: '/examples/' }
+];
+
+function buildNav(): DefaultTheme.NavItem[] {
+	nav.push({
+		text: packageJson.version,
+		items: [
+			{ text: 'Changelog', link: 'https://github.com/nDriaDev/vite-plugin-universal-api/blob/main/CHANGELOG.md' }
+		]
+	});
+	return nav;
+}
+
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
 	title: "vite-plugin-universal-api",
@@ -38,12 +57,7 @@ export default defineConfig({
 	themeConfig: {
 		// https://vitepress.dev/reference/default-theme-config
 		logo: '/logo_hd.png',
-		nav: [
-			{ text: 'Home', link: '/' },
-			{ text: 'Guide', link: '/guide/getting-started' },
-			{ text: 'API Reference', link: '/api/' },
-			{ text: 'Examples', link: '/examples/' }
-		],
+		nav: buildNav(),
 		sidebar: {
 			'/guide/': [
 				{
