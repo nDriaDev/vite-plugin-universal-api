@@ -1,5 +1,19 @@
 ### [1.0.4](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v1.0.4) - 2026-02-09
 
+## [1.0.7](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v1.0.7) - 2026-03-29
+
+### Bug Fixes
+
+- linting ([b169630](https://github.com/nDriaDev/vite-plugin-universal-api/commit/b169630))
+
+### Documentation
+
+- add lib version to doc ([7fbad3c](https://github.com/nDriaDev/vite-plugin-universal-api/commit/7fbad3c))
+
+### Chores
+
+- update dependencies ([8f30711](https://github.com/nDriaDev/vite-plugin-universal-api/commit/8f30711))
+
 ## [1.0.6](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v1.0.6) - 2026-03-12
 
 ### Chores
