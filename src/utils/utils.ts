@@ -1,7 +1,7 @@
 import { createReadStream, createWriteStream, PathLike } from "node:fs";
 import { mkdir, readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { IncomingMessage, ServerResponse } from "node:http";
-import { ApiWsRestFsDataResponse, UniversalApiErrorMiddleware, UniversalApiRestFsHandler, UniversalApiMiddleware, UniversalApiOptions, UniversalApiOptionsRequired, UniversalApiParser, UniversalApiParserFunction, UniversalApiRequest, UniversalApiWsHandler } from "src/models/index.model";
+import { ApiWsRestFsDataResponse, UniversalApiErrorMiddleware, UniversalApiRestFsHandler, UniversalApiMiddleware, UniversalApiOptions, UniversalApiOptionsRequired, UniversalApiParser, UniversalApiParserFunction, UniversalApiRequest, UniversalApiWsHandler } from "../models/index.model";
 import { ResolvedConfig } from "vite";
 import { AntPathMatcher } from "./AntPathMatcher";
 import { join, parse as parsePath } from "node:path";
@@ -10,7 +10,7 @@ import { StringDecoder } from "node:string_decoder";
 import { MimeType, MimeTypeExt } from "./MimeType";
 import { Constants } from "./constants";
 import { UniversalApiError } from "./Error";
-import { ILogger } from "src/models/logger.model";
+import { ILogger } from "../models/logger.model";
 import { createHash } from "node:crypto";
 
 function patchWalkPath(target: any, path: string) {

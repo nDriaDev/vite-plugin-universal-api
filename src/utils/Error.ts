@@ -1,4 +1,4 @@
-import { UniversalApiErrorType, IUniversalApiError } from "src/models/error.model";
+import { IUniversalApiError, UniversalApiErrorType } from "../models/error.model";
 import { Constants } from "./constants";
 
 export class UniversalApiError extends Error implements IUniversalApiError {

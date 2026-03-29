@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Connect, PreviewServer, ViteDevServer } from "vite";
-import { ApiWsRestFsDataResponse, UniversalApiRestFsHandler, UniversalApiOptionsRequired, UniversalApiRequest, HandledRequestData, UniversalApiWsHandler } from "src/models/index.model";
+import { ApiWsRestFsDataResponse, UniversalApiRestFsHandler, UniversalApiOptionsRequired, UniversalApiRequest, HandledRequestData, UniversalApiWsHandler } from "../models/index.model";
 import { Utils } from "./utils";
 import { join, parse } from "node:path";
 import { MimeType } from "./MimeType";
@@ -9,8 +9,8 @@ import { AntPathMatcher } from "./AntPathMatcher";
 import { UniversalApiError } from "./Error";
 import { Socket } from "node:net";
 import { ConnectionManager, WebSocketConnection, WebSocketFrameParser } from "./WebSocket";
-import { ILogger } from "src/models/logger.model";
-import { IWebSocketConnection, WebSocketFrame } from "src/models/webSocket.model";
+import { ILogger } from "../models/logger.model";
+import { IWebSocketConnection, WebSocketFrame } from "../models/webSocket.model";
 
 /* v8 ignore start */
 /**

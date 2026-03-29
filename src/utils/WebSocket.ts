@@ -1,8 +1,8 @@
 import { Socket } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { constants, createDeflateRaw, createInflateRaw } from 'node:zlib';
-import { DeflateOptions, IConnectionManager, IWebSocketConnection, IWebSocketDeflate, IWebSocketFrameParser, PerMessageDeflateExension, WebSocketFrame } from 'src/models/webSocket.model';
-import { ILogger } from 'src/models/logger.model';
+import { DeflateOptions, IConnectionManager, IWebSocketConnection, IWebSocketDeflate, IWebSocketFrameParser, PerMessageDeflateExension, WebSocketFrame } from '../models/webSocket.model';
+import { ILogger } from '../models/logger.model';
 
 export class WebSocketFrameParser implements IWebSocketFrameParser {
 	private buffer: Buffer = Buffer.alloc(0);

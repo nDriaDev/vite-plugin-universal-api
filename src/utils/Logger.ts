@@ -1,4 +1,4 @@
-import { ILogger } from "src/models/logger.model";
+import { ILogger } from "../models/logger.model";
 import { LogLevel } from "vite";
 
 export class Logger implements ILogger {

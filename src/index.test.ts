@@ -1359,7 +1359,7 @@ describe('Test plugin', async () => {
 								{ key: 'status', valueType: 'string[]', comparison: 'eq' },
 								{ key: 'd', valueType: 'boolean[]', comparison: 'eq' },
 								{ key: 'dd', valueType: 'boolean[]', comparison: 'eq' },
-								{ key: 'f', valueType: val => !val, comparison: 'eq' }
+								{ key: 'f', valueType: (val: any) => !val, comparison: 'eq' }
 							]
 						}
 					}
@@ -1692,7 +1692,7 @@ describe('Test plugin', async () => {
 								{ key: 'workedAt', valueType: 'date[]', comparison: 'eq' },
 								{ key: 'status', valueType: 'string[]', comparison: 'eq' },
 								{ key: 'd', valueType: 'boolean[]', comparison: 'eq' },
-								{ key: 'f', valueType: val => !val, comparison: 'eq' }
+								{ key: 'f', valueType: (val: any) => !val, comparison: 'eq' }
 							]
 						}
 					},
@@ -1829,11 +1829,11 @@ describe('Test plugin', async () => {
 						fullUrlMock,
 						{
 							parser: [
-								(req, res, next) => {
+								(req: any, res: any, next: any) => {
 									throw Error("generic");
 								}
 							],
-							transform: req => {
+							transform: (req: any) => {
 								return {};
 							}
 						},

@@ -1,8 +1,8 @@
 import { IncomingMessage, ServerResponse } from "node:http";
-import { AntPathMatcher } from "src/utils/AntPathMatcher";
 import { Connect, LogLevel, ResolvedConfig } from "vite";
 import { IUniversalApiError } from "./error.model";
 import { IWebSocketConnection, PerMessageDeflateExension } from "./webSocket.model";
+import { AntPathMatcher } from "../utils/AntPathMatcher";
 
 /**
  * Extended HTTP request object used by the plugin.
