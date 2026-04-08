@@ -1,7 +1,7 @@
 import { createReadStream, createWriteStream, PathLike } from "node:fs";
 import { mkdir, readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { IncomingMessage, ServerResponse } from "node:http";
-import { ApiWsRestFsDataResponse, UniversalApiErrorMiddleware, UniversalApiRestFsHandler, UniversalApiMiddleware, UniversalApiOptions, UniversalApiOptionsRequired, UniversalApiParser, UniversalApiParserFunction, UniversalApiRequest, UniversalApiWsHandler } from "../models/index.model";
+import { ApiWsRestFsDataResponse, UniversalApiErrorMiddleware, UniversalApiRestFsHandler, UniversalApiMiddleware, UniversalApiOptions, UniversalApiOptionsRequired, UniversalApiParser, UniversalApiParserFunction, UniversalApiRequest } from "../models/index.model";
 import { ResolvedConfig } from "vite";
 import { AntPathMatcher } from "./AntPathMatcher";
 import { join, parse as parsePath } from "node:path";
@@ -11,7 +11,6 @@ import { MimeType, MimeTypeExt } from "./MimeType";
 import { Constants } from "./constants";
 import { UniversalApiError } from "./Error";
 import { ILogger } from "../models/logger.model";
-import { createHash } from "node:crypto";
 
 function patchWalkPath(target: any, path: string) {
     const segments = path.split('/').filter(s => s !== '');
@@ -67,6 +66,7 @@ export const Utils = {
                 gatewayTimeout: opts?.gatewayTimeout ?? 0,
 				endpointPrefix: endpointPrefix.filter(el => el !== "" && el !== "/"),
 				enableWs: opts?.enableWs ?? false,
+				enablePreview: opts?.enablePreview ?? true,
                 fsDir: opts?.fsDir ?? null,
                 fullFsDir: fullFsDir || null,
 				noHandledRestFsRequestsAction: opts?.noHandledRestFsRequestsAction ?? "404",
@@ -154,7 +154,7 @@ export const Utils = {
 			return promise;
 		},
         async writingFile(s: string, fileFound: boolean, data: any, mimeType: MimeType | null, withStream: boolean) {
-			const { dir, ext } = parsePath(Utils.request.removeSlash(s, "both"));
+			const { dir, ext } = parsePath(s);
 			let file, path = s, options = {};
 			if (!fileFound) {
 				await Utils.files.createDir(dir);
@@ -258,7 +258,7 @@ export const Utils = {
 					}
 				}
 			} else {
-				// INFO RFC 6092 standard (JSON Patch)
+				// INFO RFC 6902 standard (JSON Patch)
 				if (!Array.isArray(patch)) {
 					throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 				}
@@ -352,18 +352,22 @@ export const Utils = {
                 newUrl.startsWith("/") && (newUrl = newUrl.substring(1));
             }
             if (["both", "trailing"].includes(type)) {
-                newUrl.endsWith("/") && (newUrl = newUrl.substring(newUrl.length - 1));
+                newUrl.endsWith("/") && (newUrl = newUrl.substring(0, newUrl.length - 1));
             }
             return newUrl;
         },
         buildFullUrl(req: IncomingMessage, config: ResolvedConfig): URL {
-			return new URL(req.url!, `http${config.server.https ? 's' : ''}://${config.server.host ?? req.headers.host ?? "localhost"}`);
+			const host = typeof config.server.host === "string"
+				? config.server.host
+				: req.headers.host ?? "localhost";
+			return new URL(req.url!, `http${config.server.https ? 's' : ''}://${host}`);
         },
 		matchesEndpointPrefix(url: string | undefined, prefixes: string[]) {
 			if (url) {
-				const slices = url.split("/");
-				const prefix = slices[0] === "" ? slices[1] : slices[0];
-				return prefixes.some(el => el.startsWith("/" + prefix));
+				const pathname = url.split("?")[0];
+				return prefixes.some(prefix =>
+					pathname === prefix || pathname.startsWith(prefix + "/")
+				);
 			}
 			return false;
         },
@@ -379,32 +383,35 @@ export const Utils = {
             }
             return url;
         },
-        async mergeBodyChunk(req: IncomingMessage): Promise<string | null> {
-			let body = '',
-				receiveData = false;
-            const decoder = new StringDecoder("utf8");
-            const { promise, resolve, reject } = Utils.plugin.promiseWithResolver<string | null>();
-			req.on("data", chunk => {
+        async mergeBodyChunk(req: IncomingMessage): Promise<Buffer | null> {
+			const chunks: Buffer[] = [];
+			let receiveData = false;
+			const { promise, resolve, reject } = Utils.plugin.promiseWithResolver<Buffer | null>();
+
+			req.on("data", (chunk: Buffer) => {
 				receiveData = true;
-                body += decoder.write(chunk);
-            })
-            req.on("error", () => {
-                reject(new Error("Error parsing request body"));
-            })
+				chunks.push(chunk);
+			});
+
+			req.on("error", () => {
+				reject(new Error("Error parsing request body"));
+			});
+
 			req.on("end", () => {
-                resolve(receiveData ? body : null);
-            })
-            return promise;
+				resolve(receiveData ? Buffer.concat(chunks) : null);
+			});
+
+			return promise;
 		},
-		createRequest(req: IncomingMessage): UniversalApiRequest {
-			const request: UniversalApiRequest = req as UniversalApiRequest;
+		createRequest(req: IncomingMessage): UniversalApiRequest<unknown> {
+			const request: UniversalApiRequest<any> = req as UniversalApiRequest<any>;
 			request.body = null;
 			request.files = null;
 			request.params = null;
 			request.query = new URLSearchParams();
 			return request;
 		},
-		async parseRequest(request: UniversalApiRequest, res: ServerResponse, fullUrl: URL, parserRequest: UniversalApiParser, logger: ILogger) {
+		async parseRequest(request: UniversalApiRequest<any>, res: ServerResponse, fullUrl: URL, parserRequest: UniversalApiParser, logger: ILogger) {
 			try {
 				if (parserRequest) {
 					logger.debug("parseRequest: START");
@@ -425,87 +432,96 @@ export const Utils = {
 						query != undefined && (request.query = query);
 					} else {
 						const { query } = parse(request.url!, true);
-						let body: any = null,
-							files: UniversalApiRequest["files"] = null;
-						const mergedChunk = await this.mergeBodyChunk(request);
+						let buildBody = false;
+						let body: unknown = null,
+							files: UniversalApiRequest<unknown>["files"] = null;
+						const mergedChunk: Buffer | null = await this.mergeBodyChunk(request);
 						const contentType = request.headers["content-type"];
 						if (mergedChunk !== null) {
-							if (contentType?.includes("text")) {
-								body = mergedChunk;
-							} else if (["application/json", "application/merge-patch+json", "application/json-patch+json"].includes(contentType || "")) {
-								body = JSON.parse(mergedChunk);
-							} else if (contentType?.includes("application/x-www-form-urlencoded")) {
-								body = Object.fromEntries(new URLSearchParams(mergedChunk));
+							if (contentType?.includes("text") || ["application/json", "application/merge-patch+json", "application/json-patch+json"].includes(contentType || "") || contentType?.includes("application/x-www-form-urlencoded")) {
+								const bodyString = mergedChunk.toString("utf-8");
+								buildBody = true;
+								if (contentType?.includes("text")) {
+									body = bodyString;
+								} else if (contentType?.includes("json")) {
+									try {
+										body = JSON.parse(bodyString);
+									} catch (_) {
+										body = bodyString;
+									}
+								} else {
+									body = Object.fromEntries(new URLSearchParams(bodyString));
+								}
 							} else if (contentType?.includes('multipart/form-data')) {
+								body = {};
 								const boundary = contentType.split("boundary=")[1];
-								const parts: Record<string, string>[] = [];
 								const boundaryStr = `--${boundary}`;
-								const endBoundaryStr = `--${boundary}--`;
+								const bodyString = mergedChunk.toString("binary");
+								const trimmedBody = bodyString.trimEnd();
+								const cleanBody = trimmedBody.endsWith(`${boundaryStr}--`)
+									? trimmedBody.slice(0, -2)
+									: bodyString;
 
-								const bodyWithouEndBoundary = mergedChunk.split(endBoundaryStr)[0];
-								const rawParts: string[] = bodyWithouEndBoundary.split(boundaryStr).filter((part: string) => part.trim() !== '');
+								const rawParts: string[] = cleanBody.split(boundaryStr).filter((part: string) => part.trim() !== '');
 
 								rawParts.forEach(part => {
+									const divider = '\r\n\r\n';
+									const dividerIndex = part.indexOf(divider);
+									if (dividerIndex === -1) {
+										return;
+									}
+									const headersPart = part.substring(0, dividerIndex);
+									let bodyPartString = part.substring(dividerIndex + divider.length);
+									bodyPartString = bodyPartString.replace(/\r\n$/, "");
+									const headerLines = headersPart.trim().split("\r\n");
 									const partData: Record<string, string> = {};
-									const headersAndBody = part.split('\r\n\r\n');
-									const headers = headersAndBody[0].trim();
-									const body = headersAndBody[1];
-									const headerLines = headers.split("\r\n");
-
 									headerLines.forEach(line => {
-										const [key, value] = line.split(": ");
-										if (key && value) {
+										const colonIndex = line.indexOf(": ");
+										if (colonIndex !== -1) {
+											const key = line.substring(0, colonIndex);
+											const value = line.substring(colonIndex + 2);
 											partData[key.toLowerCase()] = value;
 										}
-									})
+									});
 
-									partData.body = body.trim();
-									parts.push(partData);
-								});
-								parts.forEach(part => {
-									if (part["content-disposition"]) {
-										const disposition = part["content-disposition"];
-										const partContentType = part["content-type"] || "text/plain";
-										const IS_FILE = disposition.indexOf("filename=") !== -1;
-										let [, name, filename] = disposition.split(";");
-										if (name && name.includes("name=")) {
-											name = name.split("name=")[1].replace(/"/g, "");
+									const disposition = partData["content-disposition"] || "";
+									const isFile = disposition.includes("filename=");
+
+									const partBuffer = Buffer.from(bodyPartString, "binary");
+									const name = disposition.match(/name="([^"]+)"/)?.[1];
+									const filename = disposition.match(/filename="([^"]+)"/)?.[1];
+									const partContentType = partData["content-type"] || "";
+									let finalContent: any = partBuffer;
+									// INFO JSON file are writed as JSON, text as string
+									if (partContentType.includes("application/json")) {
+										try {
+											finalContent = JSON.parse(partBuffer.toString("utf-8").trim());
+										} catch (_) {
+											finalContent = partBuffer.toString("utf-8");
 										}
-										if (filename && filename.includes("filename=")) {
-											filename = filename.split("filename=")[1].replace(/"/g, "");
-										}
-										let data;
-										if (partContentType.includes("application/json")) {
-											data = JSON.parse(part.body);
-										} else if (partContentType.includes("text")) {
-											data = part.body;
-										} else if (partContentType.includes("application/x-www-form-urlencoded")) {
-											data = new URLSearchParams(part.body);
-										} else {
-											data = Buffer.from(part.body, "binary");
-										}
-										if (IS_FILE) {
-											if (!files) {
-												files = [];
-											}
-											files.push({
-												name: filename,
-												content: data,
-												contentType: partContentType
-											});
-										} else {
-											body = {};
-											name
-												? (body[name] = data)
-												: (body = data);
-										}
+									} else if (partContentType.includes("text/") || !isFile) {
+										finalContent = partBuffer.toString("utf-8");
+									}
+									if (isFile) {
+										!files && (files = []);
+										files.push({
+											name: filename!,
+											content: finalContent,
+											contentType: partContentType || "application/octet-stream"
+										});
+									} else {
+										(body as Record<string, any>)[name ?? ''] = finalContent;
+										buildBody = true;
 									}
 								});
 							} else {
+								let parsed;
+								buildBody = true;
 								try {
-									body = JSON.parse(mergedChunk);
+									parsed = mergedChunk.toString("utf-8");
+									body = JSON.parse(parsed.trim());
 								} catch (_) {
-									body = mergedChunk;
+									body = parsed ?? mergedChunk;
 								}
 							}
 						}
@@ -515,7 +531,7 @@ export const Utils = {
 								request.query.append(key, Array.isArray(value) ? value.join(",") : value ?? '');
 							});
 						}
-						request.body = body;
+						request.body = buildBody ? body : null;
 						request.files = files;
 					}
 				} else {
@@ -537,7 +553,7 @@ export const Utils = {
 				errorMiddlewares.push(...me.filter(me => me !== null));
 			}
 
-			async function handle(req: UniversalApiRequest, res: ServerResponse, error?: any) {
+			async function handle(req: UniversalApiRequest<any>, res: ServerResponse, error?: any) {
 				let mIdx = 0,
 					emIdx = 0,
 					lastError: any = null;
@@ -573,7 +589,7 @@ export const Utils = {
 				}
 			}
 
-			async function handleError(req: UniversalApiRequest, res: ServerResponse, error: any, errorMiddlewares: UniversalApiErrorMiddleware[]) {
+			async function handleError(req: UniversalApiRequest<any>, res: ServerResponse, error: any, errorMiddlewares: UniversalApiErrorMiddleware[]) {
 				use([], errorMiddlewares);
 				await handle(req, res, error);
 			}
@@ -584,13 +600,13 @@ export const Utils = {
                 use
             };
 		},
-		hasPaginationOrFilters(method: UniversalApiRequest["method"], paginationPlugin: UniversalApiOptionsRequired["pagination"], filterPlugin: UniversalApiOptionsRequired["filters"], paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"]) {
+		hasPaginationOrFilters(method: UniversalApiRequest<any>["method"], paginationPlugin: UniversalApiOptionsRequired["pagination"], filterPlugin: UniversalApiOptionsRequired["filters"], paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"]) {
 			return (!!paginationHandler && paginationHandler !== "none")
 				|| (!!filtersHandler && filtersHandler !== null)
 				|| (paginationPlugin !== null && (method! in paginationPlugin || "ALL" in paginationPlugin))
 				|| (filterPlugin !== null && (method! in filterPlugin || "ALL" in filterPlugin))
 		},
-        getPaginationAndFilters(request: UniversalApiRequest, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"]): { pagination: null | { limit: null | number, skip: null | number, sort: null | string, order: null | string }, filters: null | { key: string, value: any, comparison: string, regexFlags?: string }[] } {
+        getPaginationAndFilters(request: UniversalApiRequest<any>, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"]): { pagination: null | { limit: null | number, skip: null | number, sort: null | string, order: null | string }, filters: null | { key: string, value: any, comparison: string, regexFlags?: string }[] } {
             const result: { pagination: null | { limit: null | number, skip: null | number, sort: null | string, order: null | string }, filters: null | { key: string, value: any, comparison: string, regexFlags?: string }[] } = {
                 pagination: null,
 				filters: null
@@ -897,7 +913,7 @@ export const Utils = {
             }
             return result;
 		},
-		applyPaginationAndFilters(request: UniversalApiRequest, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"], dataFile: { originalData: any, data: any, mimeType: string, total: number}) {
+		applyPaginationAndFilters(request: UniversalApiRequest<any>, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"], dataFile: { originalData: any, data: any, mimeType: string, total: number}) {
 			const data = JSON.parse(dataFile.data);
 			dataFile.originalData = JSON.parse(dataFile.data);
 			dataFile.data = data;
@@ -979,7 +995,11 @@ export const Utils = {
 										: 0
 						});
 					}
-					dataFile.data = dataFile.data.slice(pagination.skip ?? undefined, ((pagination.limit ?? 0) + (pagination.skip ?? 0) || undefined))
+					const start = pagination.skip ?? undefined;
+					const end = pagination.limit !== null
+						? (pagination.limit + (pagination.skip ?? 0))
+						: undefined;
+					dataFile.data = dataFile.data.slice(start, end);
 				}
 				!IS_ARRAY && (dataFile.data = dataFile.data.length > 0 ? dataFile.data[0] : null);
 			}
@@ -996,11 +1016,11 @@ export const Utils = {
 					const IS_FILT_EXCLUSIVE = filtersHandler && filtersHandler !== "none" && "exclusive" in filtersHandler && filtersHandler.exclusive?.type === "body";
                     if (paginationHandler && paginationHandler !== "none" && (paginationHandler?.exclusive || paginationHandler?.inclusive)?.type === "body") {
 						const exclIncl = paginationHandler?.exclusive ? "exclusive" : "inclusive";
-						paginationHandler[exclIncl]?.root && paginationHandler[exclIncl].root in body && keysToExclude.push(paginationHandler[exclIncl].root);
-						!paginationHandler[exclIncl]?.root && paginationHandler[exclIncl]?.limit && paginationHandler[exclIncl].limit in body && keysToExclude.push(paginationHandler[exclIncl].limit);
-						!paginationHandler[exclIncl]?.root && paginationHandler[exclIncl]?.skip && paginationHandler[exclIncl].skip in body && keysToExclude.push(paginationHandler[exclIncl].skip);
-						!paginationHandler[exclIncl]?.root && paginationHandler[exclIncl]?.sort && paginationHandler[exclIncl].sort in body && keysToExclude.push(paginationHandler[exclIncl].sort);
-						!paginationHandler[exclIncl]?.root && paginationHandler[exclIncl]?.order && paginationHandler[exclIncl].order in body && keysToExclude.push(paginationHandler[exclIncl].order);
+						paginationHandler[exclIncl]?.root && paginationHandler[exclIncl].root in elem && keysToExclude.push(paginationHandler[exclIncl].root);
+						!paginationHandler[exclIncl]?.root && paginationHandler[exclIncl]?.limit && paginationHandler[exclIncl].limit in elem && keysToExclude.push(paginationHandler[exclIncl].limit);
+						!paginationHandler[exclIncl]?.root && paginationHandler[exclIncl]?.skip && paginationHandler[exclIncl].skip in elem && keysToExclude.push(paginationHandler[exclIncl].skip);
+						!paginationHandler[exclIncl]?.root && paginationHandler[exclIncl]?.sort && paginationHandler[exclIncl].sort in elem && keysToExclude.push(paginationHandler[exclIncl].sort);
+						!paginationHandler[exclIncl]?.root && paginationHandler[exclIncl]?.order && paginationHandler[exclIncl].order in elem && keysToExclude.push(paginationHandler[exclIncl].order);
                     }
                     if (!IS_PAG_EXCLUSIVE && paginationPlugin && (paginationPlugin[requestMethod! as keyof typeof paginationPlugin] || paginationPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!))) {
                         const pag = requestMethod && requestMethod in paginationPlugin ? paginationPlugin[requestMethod as keyof typeof paginationPlugin] : paginationPlugin.ALL;
@@ -1112,7 +1132,7 @@ export const Utils = {
 					return false;
 				}
 			}
-			return [null, undefined].includes(body) || typeof body === 'object' && !Array.isArray(body);
+			return body !== null && body !== undefined && (Array.isArray(body) || typeof body === 'object');
 		}
     },
 	response: {
@@ -1120,6 +1140,9 @@ export const Utils = {
 		async sendStreamFile(res: ServerResponse, data: ApiWsRestFsDataResponse) {
 			const { promise, reject, resolve } = Utils.plugin.promiseWithResolver<void>();
 			const { size } = await stat(data.data);
+			data.headers.push({ name: "content-length", value: size });
+			res.statusCode = data.status;
+			data.headers.forEach(({ name, value }) => res.setHeader(name, value));
 			const stream = createReadStream(data.data);
 			stream.on('error', (err) => {
 				data.status = 500;
@@ -1130,9 +1153,7 @@ export const Utils = {
 				reject(err);
 			});
 			res.on('finish', () => {
-				data.status = 200;
-				data.headers.push({ name: "content-length", value: size });
-				resolve()
+				resolve();
 			});
 			stream.pipe(res);
 			return promise;
@@ -1165,7 +1186,7 @@ export const Utils = {
 					logger.debug(`settingResponse: errorMiddlewares founded.`);
 					const chain = Utils.request.MiddlewaresChain();
 					try {
-						await chain.handleError(responseData.req as UniversalApiRequest, res, responseData.error, responseData.errorMiddlewares);
+						await chain.handleError(responseData.req as UniversalApiRequest<any>, res, responseData.error, responseData.errorMiddlewares);
 						return Promise.resolve(null);
 					} catch (error: any) {
 						logger.error(`settingResponse: ERROR - failed to evalute errorMiddlewares. Original error`, error);
@@ -1213,10 +1234,6 @@ export const Utils = {
 								]);
 							} else {
 								await this.sendStreamFile(res, responseData);
-								res.statusCode = responseData.status;
-								responseData.headers.forEach(({ name, value }) => {
-									res.setHeader(name, value);
-								});
 							}
 						} catch (error: any) {
 							logger.error(`settingResponse: ERROR - failed to send stream data.`, error);
@@ -1265,6 +1282,6 @@ export const Utils = {
 			} finally {
 				logger.debug(`settingResponse: END`);
 			}
-		}
+        }
 	}
 }

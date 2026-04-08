@@ -193,14 +193,15 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 								logger.debug("handlingApiFsRequest: ERROR parsing json content file ", file!, error);
 								throw new UniversalApiError(`Error parsing json content file ${file}`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 							}
+						} else {
+							try {
+								dataFile.data = JSON.parse(dataFile.data);
+								Array.isArray(dataFile.data) && (dataFile.total = dataFile.data.length);
+							} catch (_) {
+								dataFile.total = 1;
+							}
 						}
 						request.method === "GET" && (result.data = dataFile.data);
-						try {
-							const datas = JSON.parse(dataFile.data);
-							Array.isArray(datas) && (dataFile.total = datas.length);
-						} catch (_) {
-							dataFile.total = 1;
-						}
 						result.headers.push(
 							{ name: "content-length", value: Utils.files.getByteLength(dataFile.data) },
 							{ name: Constants.TOTAL_ELEMENTS_HEADER, value: dataFile.total }
@@ -246,7 +247,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 					if (HAS_BODY && HAS_FILE) {
 						throw new UniversalApiError(`POST request with file and body is not allowed in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 					}
-					let writeFile = -1;
+					let writeFile: any = -1;
 					if (fileFound) {
 						if (!IS_JSON_FILE) {
 							throw new UniversalApiError(`POST request for not json file is not allowed in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
@@ -265,7 +266,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 									throw error;
 								}
 								logger.debug("handlingApiFsRequest: ERROR parsing json content file", file!, error);
-								throw new UniversalApiError(`Error to retrive filtered and paginated data from ${file}`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+								throw new UniversalApiError(`Error retrieving filtered and paginated data from ${file}`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 							}
 						}
 						if (HAS_DATA) {
@@ -284,7 +285,6 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 								? 1
 								: 0;
 						result.headers.push(
-							...result.headers,
 							{ name: "content-type", value: dataFile.mimeType },
 							{ name: "content-length", value: Utils.files.getByteLength(dataFile.data) },
 							{ name: Constants.TOTAL_ELEMENTS_HEADER, value: dataFile.total }
@@ -418,6 +418,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 								JSON.stringify(dataFile.originalData[key]) === JSON.stringify(dataFile.data[key]) && delete (newData as Record<string, any>)[key];
 							})
 						}
+						// INFO partial delete allowed allowed in json file with array
 						if (Array.isArray(newData) && newData.length > 0) {
 							removeFile = false;
 							await Utils.files.writingFile(file, fileFound, newData, MimeType[".json"], true);
@@ -622,7 +623,7 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 						}
 						break;
 					case "MANUALLY_HANDLED":
-						dataResponse.data = `${error.message} Handle request not send any response`;
+						dataResponse.data = `${error.message} Handled request did not send any response`;
 						break;
 					case "ERROR":
 						dataResponse.status = error.getCode();
@@ -657,7 +658,6 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 		if (error === "next") {
 			next();
 		} else {
-			process.exitCode = -1;
 			next(error);
 		}
 	} finally {
@@ -735,8 +735,8 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 		if (handler === null) {
 			logger.debug(`runWsPlugin: no handler for ${url.pathname}`);
 			socket.end("HTTP/1.1 404 Not Found\r\n\r\n");
-		return;
-	}
+			return;
+		}
 
 		const currentHandler = handler;
 
