@@ -1,5 +1,39 @@
 ### [1.0.4](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v1.0.4) - 2026-02-09
 
+## [2.0.0](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v2.0.0) - 2026-04-08
+
+### Features
+
+- replace ws self implementation with ws library ([e56ea35](https://github.com/nDriaDev/vite-plugin-universal-api/commit/e56ea35))
+
+### Bug Fixes
+
+- various ([4bc9184](https://github.com/nDriaDev/vite-plugin-universal-api/commit/4bc9184))
+- utility + various ([57eeb65](https://github.com/nDriaDev/vite-plugin-universal-api/commit/57eeb65))
+- UniversalApiRequest body type ([c0ad276](https://github.com/nDriaDev/vite-plugin-universal-api/commit/c0ad276))
+
+### Performance Improvements
+
+- handling HMR in plugin logic ([c34a2ec](https://github.com/nDriaDev/vite-plugin-universal-api/commit/c34a2ec))
+
+### Code Refactoring
+
+- various ([ccb3a28](https://github.com/nDriaDev/vite-plugin-universal-api/commit/ccb3a28))
+
+### Documentation
+
+- fix documentation errors ([0d0a42f](https://github.com/nDriaDev/vite-plugin-universal-api/commit/0d0a42f))
+- fix documentation errors ([55aa1c7](https://github.com/nDriaDev/vite-plugin-universal-api/commit/55aa1c7))
+
+### Tests
+
+- reimplement test cases ([4b66189](https://github.com/nDriaDev/vite-plugin-universal-api/commit/4b66189))
+
+### Chores
+
+- update dependencies ([4e6e800](https://github.com/nDriaDev/vite-plugin-universal-api/commit/4e6e800))
+- **dependencies**: vite peer dep ([08753b7](https://github.com/nDriaDev/vite-plugin-universal-api/commit/08753b7))
+
 ## [1.0.7](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v1.0.7) - 2026-03-29
 
 ### Bug Fixes
