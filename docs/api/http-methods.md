@@ -10,7 +10,7 @@ Comprehensive reference showing how different HTTP methods are handled in File-S
 | **GET** | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No | Error | 404 |
 | **HEAD** | ✅ Yes | ❌ No | ❌ No | ✅ Yes (JSON arrays) | ✅ Yes (JSON arrays) | Returns headers only | 200 |
 | **POST** | ❌ No | ✅ Yes | ✅ Yes (single) | ❌ No | ❌ No | Creates new file | 201 |
-| **POST** | ✅ Yes (JSON) | ✅ Yes | ❌ No | ✅ Yes | ✅ Yes | Returns filtered data | 200 |
+| **POST** | ✅ Yes (JSON) | ✅ Yes (no file) | ❌ No | ✅ Yes | ✅ Yes | Returns filtered data | 200 |
 | **POST** | ✅ Yes (non-JSON) | - | - | ❌ No | ❌ No | Error | 400 |
 | **PUT** | ❌ No | ✅ Yes | ✅ Yes (single) | ❌ No | ❌ No | Creates file | 201 |
 | **PUT** | ✅ Yes | ✅ Yes | ✅ Yes (single) | ❌ No | ❌ No | Replaces file | 200 |

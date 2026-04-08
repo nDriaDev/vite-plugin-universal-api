@@ -40,7 +40,7 @@ All integrated seamlessly into your Vite development server, with hot reload and
 Before you begin, make sure you have:
 
 - **Node.js**: `^16.0.0 || ^18.0.0 || >=20.0.0`
-- **Vite**: `^4.0.0 || ^5.0.0 || ^6.0.0 || >7.0.0 || >=8.0.0`
+- **Vite**: `^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || >=8.0.0`
 
 ## Installation
 

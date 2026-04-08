@@ -61,7 +61,7 @@ export default defineConfig({
 type UniversalApiMiddleware<TBody = unknown> = (
   req: UniversalApiRequest<TBody>,
   res: ServerResponse,
-  next: () => void
+  next: Connect.NextFunction
 ) => void | Promise<void>
 ```
 
@@ -241,11 +241,11 @@ errorMiddlewares: [
 ### Error Handler Signature
 
 ```typescript
-type UniversalApiErrorMiddleware<TBody = unknown> = (
+type UniversalApiErrorMiddleware = (
   err: any,
-  req: UniversalApiRequest<TBody> | IncomingMessage,
+  req: UniversalApiRequest | IncomingMessage,
   res: ServerResponse,
-  next: (err?: any) => void
+  next: Connect.NextFunction
 ) => void | Promise<void>
 ```
 

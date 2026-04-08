@@ -49,10 +49,14 @@ universalApi({
 
 ``` ts
 parser: {
-  parser: ParserFunction | ParserFunction[],
+  parser: UniversalApiParserFunction | UniversalApiParserFunction[],
   transform: (req: IncomingMessage) => ({
     body?: any
-    files?: UploadedFile[]
+    files?: {
+      name: string
+      content: Buffer<ArrayBuffer>
+      contentType: string
+    }[]
     query?: URLSearchParams
   })
 }

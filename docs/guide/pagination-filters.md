@@ -265,15 +265,33 @@ GET /api/users?status=active
 
 #### Numeric Filters
 
+::: warning key maps to both the query param AND the JSON field
+The `key` value is used for two purposes simultaneously: it is the name of the query parameter (or body field) read from the request, **and** the name of the field looked up on each item in the JSON array. This means the parameter name must match the field name in your data.
+
+```typescript
+// ✅ Correct: query param 'age' → filters on item.age in JSON
+{ key: 'age', valueType: 'number', comparison: 'gte' }
+// Request: GET /api/users?age=18
+// Data:    [{ "id": 1, "age": 30 }, { "id": 2, "age": 15 }]
+// Result:  [{ "id": 1, "age": 30 }]
+
+// ❌ Wrong: query param 'minAge' would look for item.minAge in JSON, not item.age
+{ key: 'minAge', valueType: 'number', comparison: 'gte' }
+// Request: GET /api/users?minAge=18
+// Data:    [{ "id": 1, "age": 30 }]
+// Result:  [] — no item has a 'minAge' field
+```
+:::
+
 ```typescript
 filters: [
   {
-    key: 'minAge',
+    key: 'age',           // query param: ?age=18  →  filters on item.age
     valueType: 'number',
     comparison: 'gte'
   },
   {
-    key: 'maxAge',
+    key: 'age',           // query param: ?age=65  →  filters on item.age
     valueType: 'number',
     comparison: 'lte'
   }
@@ -281,8 +299,9 @@ filters: [
 ```
 
 ```bash
-GET /api/users?minAge=18&maxAge=65
-# Returns users where age >= 18 AND age <= 65
+GET /api/users?age=18   # items where age >= 18
+# To combine gte + lte on the same field, define two filter entries with the same key
+# but different comparison operators (not supported directly — use a custom handler instead)
 ```
 
 #### Array Filters
@@ -471,22 +490,44 @@ GET /api/users?status=active&role=admin&verified=true
 
 ### Range Queries
 
+::: warning Same field, two filters
+To filter a range on a single numeric field (e.g. `price`), define two separate filter entries with the same `key` (matching the JSON field name) and different comparison operators. The query parameter name must match the JSON field name.
+:::
+
 ```typescript
 filters: {
   GET: {
     type: 'query-param',
     filters: [
-      { key: 'minPrice', valueType: 'number', comparison: 'gte' },
-      { key: 'maxPrice', valueType: 'number', comparison: 'lte' }
+      { key: 'price', valueType: 'number', comparison: 'gte' },
+      { key: 'price', valueType: 'number', comparison: 'lte' }
     ]
   }
 }
 ```
 
 ```bash
-GET /api/products?minPrice=10&maxPrice=100
-# Returns products where 10 <= price <= 100
+# This only works if you pass the same param twice, which is not standard.
+# For independent min/max query params, use a custom handler instead.
+GET /api/products?price=10   # items where price >= 10 (only gte applied)
 ```
+
+::: tip For true range filters (minPrice / maxPrice), use a custom handler
+```typescript
+{
+  pattern: '/products',
+  method: 'GET',
+  handle: async (req, res) => {
+    const data = JSON.parse(await fs.readFile('mock/products.json', 'utf-8'))
+    const min = Number(req.query.get('minPrice') ?? 0)
+    const max = Number(req.query.get('maxPrice') ?? Infinity)
+    const result = data.filter((p: any) => p.price >= min && p.price <= max)
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify(result))
+  }
+}
+```
+:::
 
 ## Limitations
 
@@ -494,7 +535,7 @@ GET /api/products?minPrice=10&maxPrice=100
 - ❌ Only works with JSON arrays (not objects)
 - ❌ Does NOT work with custom handlers (must implement manually)
 - ❌ No OR logic between filters (only AND)
-- ❌ No nested field filtering (e.g., `user.address.city`)
+- ✅ Nested field filtering is supported via dot-notation (e.g., `key: 'address.city'` filters on `item.address.city`)
 
 ## Next Steps
 

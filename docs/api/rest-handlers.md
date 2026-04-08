@@ -52,8 +52,8 @@ interface UniversalApiRestFsHandler {
   disabled?:   boolean
   delay?:      number
   parser?:     UniversalApiParser
-  pagination?: "none" | { inclusive?: UniversalApiPagination, exclusive?: never } | { inclusive?: never, exclusive?: UniversalApiPagination }
-filters?: "none" | { inclusive?: UniversalApiFilter, exclusive?: never } | { inclusive?: never, exclusive?: UniversalApiFilter }
+  pagination?: 'none' | { inclusive?: UniversalApiPagination; exclusive?: never } | { inclusive?: never; exclusive?: UniversalApiPagination }
+  filters?:    'none' | { inclusive?: UniversalApiFilter; exclusive?: never } | { inclusive?: never; exclusive?: UniversalApiFilter }
   preHandle?:  UniversalApiPreHandle
   postHandle?: UniversalApiPostHandle
 }
@@ -67,8 +67,8 @@ filters?: "none" | { inclusive?: UniversalApiFilter, exclusive?: never } | { inc
 | `disabled` | `boolean` | — | If `true`, the handler is skipped. Default: `false` |
 | `delay` | `number` | — | Artificial delay in ms. Overrides the global `delay`. |
 | `parser` | `UniversalApiParser` | — | Request parser for this handler. Overrides the global `parser`. |
-| `pagination` | `UniversalApiPagination \| 'none'` | — | Pagination config. `'none'` disables the global pagination. Not available when `postHandle` is set. |
-| `filters` | `UniversalApiFilter \| 'none'` | — | Filter config. `'none'` disables the global filters. Not available when `postHandle` is set. |
+| `pagination` | `'none' \| { inclusive?: UniversalApiPagination } \| { exclusive?: UniversalApiPagination }` | — | Pagination config. `'none'` disables the global pagination. `inclusive` merges with the global config; `exclusive` replaces it entirely. Not available when `postHandle` is set. |
+| `filters` | `'none' \| { inclusive?: UniversalApiFilter } \| { exclusive?: UniversalApiFilter }` | — | Filter config. `'none'` disables the global filters. `inclusive` merges with the global config; `exclusive` replaces it entirely. Not available when `postHandle` is set. |
 | `preHandle` | `UniversalApiPreHandle` | — | URL transformation applied before the file lookup. |
 | `postHandle` | `UniversalApiPostHandle` | — | Callback invoked after the file lookup, receiving the file content. Bypasses all automatic processing. |
 
@@ -157,6 +157,8 @@ interface UploadedFile {
 }
 ```
 
+> **Note:** The TypeScript model declares `content` as `Buffer<ArrayBuffer>`. However, the built-in parser may resolve the actual runtime value to a plain `string` (for `text/*` parts) or a parsed `object` (for `application/json` parts) inside `multipart/form-data` requests. Always check the runtime value before assuming the type, especially when using the built-in parser without a custom `transform`.
+
 ---
 
 ## `HttpMethod`
@@ -198,4 +200,4 @@ For more details, see [REST Handlers Guide](/guide/rest-handlers).
 
 ## See Also
 
-- [WebSocket API Reference](/api/websocket-handlers) — tutorial with examples
+- [REST Handlers Guide](/guide/rest-handlers) — in-depth usage and examples

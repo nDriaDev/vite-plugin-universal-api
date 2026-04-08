@@ -393,7 +393,7 @@ conn.broadcast(data, { includeSelf: true })
 ### Broadcast to All Rooms This Connection Belongs To
 
 ```typescript
-conn.broadcastAllRooms({ type: 'global-update' })
+conn.broadcastAllRooms({ type: 'global-update' }, false) // includeSelf is required
 ```
 
 ## Connection Metadata

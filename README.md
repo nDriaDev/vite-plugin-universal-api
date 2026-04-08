@@ -13,9 +13,9 @@
 [![npm downloads](https://img.shields.io/npm/dt/%40ndriadev/vite-plugin-universal-api?label=DOWNLOADS&style=for-the-badge&color=red)](https://www.npmjs.com/package/%40ndriadev/vite-plugin-universal-api)
 [![License: MIT](https://img.shields.io/badge/LICENSE-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-![Statements](https://img.shields.io/badge/statements-100%25-brightgreen.svg?style=for-the-badge)
-![Branches](https://img.shields.io/badge/branches-90.99%25-green.svg?style=for-the-badge)
-![Functions](https://img.shields.io/badge/functions-99.13%25-green.svg?style=for-the-badge)
+![Statements](https://img.shields.io/badge/statements-99.68%25-brightgreen.svg?style=for-the-badge)
+![Branches](https://img.shields.io/badge/branches-90.2%25-green.svg?style=for-the-badge)
+![Functions](https://img.shields.io/badge/functions-98.17%25-green.svg?style=for-the-badge)
 ![Lines](https://img.shields.io/badge/lines-100%25-brightgreen.svg?style=for-the-badge)
 
 *Built with:*
@@ -131,7 +131,7 @@ yarn add -D @ndriadev/vite-plugin-universal-api
 ### Requirements
 
 - **Node.js**: `^16.0.0 || ^18.0.0 || >=20.0.0`
-- **Vite**: `^4.0.0 || ^5.0.0 || ^6.0.0 || >=7.0.0`
+- **Vite**: `^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || >=8.0.0`
 
 ---
 
@@ -1192,7 +1192,7 @@ interface UniversalApiRequest extends IncomingMessage {
   /** Uploaded files (multipart/form-data) */
   files: Array<{
     name: string;
-    content: Buffer;
+    content: Buffer<ArrayBuffer>;
     contentType: string;
   }> | null;
 }
@@ -1270,7 +1270,7 @@ interface IWebSocketConnection {
   /**
    * Broadcast to all rooms this connection is in
    */
-  broadcastAllRooms(data: any, includeSelf?: boolean): void;
+  broadcastAllRooms(data: any, includeSelf: boolean): void;
 
   /**
    * Join a room
