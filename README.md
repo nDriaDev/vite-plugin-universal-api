@@ -414,16 +414,16 @@ type FilterConfig = {
     /**
      * Comparison operator
      * - eq: equals
-     * - neq: not equals
+     * - ne: not equals
      * - gt: greater than
      * - gte: greater than or equal
      * - lt: less than
      * - lte: less than or equal
      * - in: value in array
      * - nin: value not in array
-     * - contains: string contains (case-insensitive)
+     * - regex: regular expression match (use `regexFlags` for flags, e.g. `"i"` for case-insensitive)
      */
-    comparison: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'nin' | 'contains';
+    comparison: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'nin' | 'regex';
   }>;
 }
 ```
@@ -1372,8 +1372,8 @@ Comprehensive table showing how different HTTP methods are handled in File-Syste
 | **PATCH** | ❌ No | - | - | ❌ No | ❌ No | Error | 404 | Resource not found |
 | **PATCH** | ✅ Yes (non-JSON) | - | - | ❌ No | ❌ No | Error | 400 | Only JSON files can be patched |
 | **PATCH** | - | ✅ (non-JSON) | - | - | - | Error | 415 | Unsupported Content-Type |
-| **DELETE** | ✅ Yes | ❌ No | ❌ No | ❌ No | ❌ No | Deletes file | 204 | • Removes entire file<br>• Returns `X-Deleted-Elements: 1` header |
-| **DELETE** | ✅ Yes (JSON) | ❌ No | ❌ No | ✅ Yes | ✅ Yes | Partial delete | 204 | • With pagination/filters: deletes matched items from array<br>• If all items deleted: removes file<br>• If some items remain: updates file<br>• Returns `X-Deleted-Elements: N` header |
+| **DELETE** | ✅ Yes | ❌ No | ❌ No | ❌ No | ❌ No | Deletes file | 204 | • Removes entire file<br>• Returns `X-Deleted-Count: 1` header |
+| **DELETE** | ✅ Yes (JSON) | ❌ No | ❌ No | ✅ Yes | ✅ Yes | Partial delete | 204 | • With pagination/filters: deletes matched items from array<br>• If all items deleted: removes file<br>• If some items remain: updates file<br>• Returns `X-Deleted-Count: N` header |
 | **DELETE** | ❌ No | - | - | ❌ No | ❌ No | Error | 404 | Resource not found |
 | **DELETE** | - | ✅ Yes | - | - | - | Error | 400 | Body not allowed in DELETE |
 | **OPTIONS** | - | - | - | ❌ No | ❌ No | Error | 405 | Method not allowed in FS mode |
@@ -1391,8 +1391,8 @@ The plugin uses custom headers for metadata:
 
 | Header | Usage | Example |
 |--------|-------|---------|
-| `X-Total-Elements` | Total number of elements (before pagination) | `X-Total-Elements: 150` |
-| `X-Deleted-Elements` | Number of elements deleted | `X-Deleted-Elements: 5` |
+| `X-Total-Count` | Total number of elements (before pagination) | `X-Total-Count: 150` |
+| `X-Deleted-Count` | Number of elements deleted | `X-Deleted-Count: 5` |
 
 #### Content-Type Requirements
 
@@ -1498,7 +1498,7 @@ DELETE behavior varies based on pagination/filters configuration:
 DELETE /api/users/123
 → Deletes entire file
 → Status: 204 No Content
-→ Header: X-Deleted-Elements: 1
+→ Header: X-Deleted-Count: 1
 ```
 
 **With Pagination/Filters (JSON Array):**
@@ -1508,7 +1508,7 @@ DELETE /api/users?status=inactive
 → If array becomes empty: deletes file
 → If items remain: updates file with remaining items
 → Status: 204 No Content
-→ Header: X-Deleted-Elements: 5
+→ Header: X-Deleted-Count: 5
 ```
 
 #### File Lookup Behavior
@@ -1719,14 +1719,14 @@ When pagination is enabled for a file-based handler:
 Supported comparison operators:
 
 - `eq`: Equals (==)
-- `neq`: Not equals (!=)
+- `ne`: Not equals (!=)
 - `gt`: Greater than (>)
 - `gte`: Greater than or equal (>=)
 - `lt`: Less than (<)
 - `lte`: Less than or equal (<=)
 - `in`: Value in array
 - `nin`: Value not in array
-- `contains`: String contains substring (case-insensitive)
+- `regex`: regular expression match (use `regexFlags` for flags, e.g. `"i"` for case-insensitive)
 
 **Example:**
 
@@ -1736,8 +1736,8 @@ filters: {
     type: 'query-param',
     filters: [
       { key: 'status', valueType: 'string', comparison: 'eq' },
-      { key: 'minAge', field: 'age', valueType: 'number', comparison: 'gte' },
-      { key: 'categories', field: 'category', valueType: 'string', comparison: 'in' }
+      { key: 'minAge', valueType: 'number', comparison: 'gte' },
+      { key: 'categories', valueType: 'string', comparison: 'in' }
     ]
   }
 }

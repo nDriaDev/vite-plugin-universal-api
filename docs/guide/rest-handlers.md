@@ -29,7 +29,7 @@ Full control with your own logic:
 
 ```typescript
 import { defineConfig } from 'vite'
-import mockApi from '@ndriadev/vite-plugin-universal-mock-api'
+import { universalApi } from '@ndriadev/vite-plugin-universal-api'
 
 export default defineConfig({
   plugins: [
@@ -80,11 +80,9 @@ Request: GET /api/users/123
 Pattern match: /users/{id} → id = "123"
 
 File lookup tries (in order):
-1. mock/users/123
-2. mock/users/123.json
-3. mock/users/123.xml
-4. mock/users/123.txt
-5. mock/users/123/index.json
+1. Exact path:           mock/users/123
+2. Directory index:      mock/users/123/index.json
+3. File with extension:  mock/users/123.<ext>  (first match in directory)
 
 If found → Serves file
 If not found → 404
@@ -110,10 +108,10 @@ handlers: [
 
 **Request flow:**
 ```
-Request:    GET /api/v2/users/123
-preHandle:  Transform to /api/v1/users/123
+Request:     GET /api/v2/users/123
+preHandle:   Transform to /api/v1/users/123
 File lookup: mock/api/v1/users/123.json
-Response:   File content
+Response:    File content
 ```
 
 **Multiple replacements:**
@@ -129,7 +127,7 @@ preHandle: {
 
 ### File-System Handler with postHandle
 
-Process file content before sending response:
+Intercept the file lookup result and write the response manually:
 
 ```typescript
 handlers: [
@@ -162,14 +160,16 @@ handlers: [
 
 **Request flow:**
 ```
-Request:     GET /api/users/123
-File lookup: mock/users/123.json
+Request:      GET /api/users/123
+File lookup:  mock/users/123.json
 File content: { "id": "123", "name": "Alice" }
-postHandle:  Wraps in envelope
-Response:    { data: { ... }, timestamp: ..., path: ... }
+postHandle:   Receives file content as `data`, wraps in envelope
+Response:     { data: { ... }, timestamp: ..., path: ... }
 ```
 
-**Note:** When using `postHandle`, pagination and filters are **not available** (you must implement them manually if needed).
+> **Important:** `postHandle` is called with the **current file content on disk** (or `null` if no file was found) regardless of the HTTP method. For `POST`, `PUT`, `PATCH`, and `DELETE`, `data` contains the file content *before* any write or delete operation. When `postHandle` is defined, the plugin skips all automatic processing — you are fully responsible for writing the response.
+
+> **Note:** When using `postHandle`, automatic pagination and filters are **not available** (you must implement them manually if needed).
 
 ## Handler Configuration
 
@@ -210,14 +210,41 @@ Supports Ant-style path patterns:
 ### Request Object
 
 ```typescript
-interface ApiWsRestFsRequest {
+interface UniversalApiRequest<TBody = unknown> {
   method: string
   url: string
   headers: Record<string, string>
-  params: Record<string, string>      // From URL pattern
-  query: URLSearchParams              // Query parameters
-  body: any                            // Parsed request body
-  files: UploadedFile[] | null        // Uploaded files
+  params: Record<string, string> | null  // From URL pattern
+  query: URLSearchParams                  // Query parameters
+  body: TBody                             // Parsed request body
+  files: UploadedFile[] | null            // Uploaded files
+}
+```
+
+The `body` field is typed via the generic `TBody` parameter (default: `unknown`). Pass a concrete type to get full type safety in your handler:
+
+```typescript
+import type { UniversalApiSimpleHandler } from '@ndriadev/vite-plugin-universal-api'
+
+interface CreateUserBody {
+  name: string
+  email: string
+  role?: string
+}
+
+// Handler with typed body
+const createUser: UniversalApiSimpleHandler<CreateUserBody> = async (req, res) => {
+  const { name, email } = req.body  // ✅ fully typed — no cast needed
+  // ...
+}
+```
+
+When using the default (untyped) form, narrow `body` with a cast before use:
+
+```typescript
+handle: async (req, res) => {
+  const body = req.body as { name: string; email: string }
+  // ...
 }
 ```
 
@@ -404,7 +431,6 @@ interface ApiWsRestFsRequest {
   handle: 'FS',
   postHandle: async (req, res, data) => {
     if (!data) {
-      // Custom 404 response
       const error = {
         error: {
           code: 'RESOURCE_NOT_FOUND',
@@ -425,81 +451,54 @@ interface ApiWsRestFsRequest {
 }
 ```
 
-### Logging and Analytics
-
-```typescript
-{
-  pattern: '/api/**',
-  method: 'GET',
-  handle: 'FS',
-  postHandle: async (req, res, data) => {
-    // Log request
-    console.log({
-      timestamp: new Date().toISOString(),
-      method: req.method,
-      url: req.url,
-      found: data !== null,
-      size: data ? data.length : 0
-    })
-
-    if (!data) {
-      res.writeHead(404)
-      res.end()
-      return
-    }
-
-    res.writeHead(200)
-    res.end(data)
-  }
-}
-```
-
 ### POST/PUT/DELETE with postHandle
+
+When `postHandle` is used with mutating methods, `data` contains the **existing file content before any write** (the current state on disk), or `null` if no file was found. The plugin skips its automatic write/delete logic entirely — you are responsible for both the response and any file operations.
 
 ```typescript
 handlers: [
-  // POST with postHandle
+  // POST with postHandle — data is the pre-existing file content, or null
   {
     pattern: '/users',
     method: 'POST',
     handle: 'FS',
     postHandle: async (req, res, data) => {
-      // data contains the written file content (or null on error)
-      if (!data) {
-        res.writeHead(500)
-        res.end(JSON.stringify({ error: 'Failed to create user' }))
+      // data = existing file content before the POST would write anything
+      // The plugin will NOT write any file; you manage the response entirely.
+      const body = req.body as { name: string; email: string }
+
+      if (!body.name || !body.email) {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: 'Missing required fields' }))
         return
       }
 
-      const created = JSON.parse(data)
+      const newUser = { id: Date.now().toString(), ...body }
 
       res.writeHead(201, {
         'Content-Type': 'application/json',
-        'Location': `/api/users/${created.id}`
+        'Location': `/api/users/${newUser.id}`
       })
-      res.end(JSON.stringify({
-        success: true,
-        data: created,
-        message: 'User created successfully'
-      }))
+      res.end(JSON.stringify({ success: true, data: newUser }))
     }
   },
 
-  // DELETE with postHandle
+  // DELETE with postHandle — data is the current file content, or null if not found
   {
     pattern: '/users/{id}',
     method: 'DELETE',
     handle: 'FS',
     postHandle: async (req, res, data) => {
-      if (data) {
-        // File was deleted successfully
-        res.writeHead(204)  // No Content
-        res.end()
-      } else {
-        // File not found
+      if (!data) {
         res.writeHead(404)
         res.end(JSON.stringify({ error: 'User not found' }))
+        return
       }
+
+      // data contains the current file content
+      // The plugin will NOT delete any file; manage it yourself if needed.
+      res.writeHead(204)
+      res.end()
     }
   }
 ]
@@ -543,12 +542,12 @@ You can use both together:
 
 **Request flow:**
 ```
-Request:     GET /api/v2/users/123
-preHandle:   Transform to /api/v1/users/123
-File lookup: mock/api/v1/users/123.json
+Request:      GET /api/v2/users/123
+preHandle:    Transform to /api/v1/users/123
+File lookup:  mock/api/v1/users/123.json
 File content: { "id": "123", "name": "Alice" }
-postHandle:  Add version fields
-Response:    { "id": "123", "name": "Alice", "version": "v2", ... }
+postHandle:   Receives content, adds version fields
+Response:     { "id": "123", "name": "Alice", "version": "v2", ... }
 ```
 
 ## Important Notes
@@ -558,10 +557,11 @@ Response:    { "id": "123", "name": "Alice", "version": "v2", ... }
 ⚠️ When using `postHandle`, these features are **NOT available**:
 - ❌ Automatic pagination
 - ❌ Automatic filters
+- ❌ Automatic file write/delete (for POST, PUT, PATCH, DELETE)
 
 You must implement them manually in your `postHandle` function if needed.
 
-**Why?** Because `postHandle` gives you full control over the response, the plugin doesn't apply automatic transformations.
+**Why?** Because `postHandle` gives you full control over the response, the plugin delegates all processing to your callback.
 
 ### preHandle vs Middleware
 
@@ -593,8 +593,6 @@ universalApi({
 })
 ```
 
-[Rest of the previous rest-handlers.md content continues here...]
-
 ## Examples
 
 ### GET - Retrieve Resource
@@ -621,12 +619,18 @@ universalApi({
 ### POST - Create Resource
 
 ```typescript
+interface CreateUserBody {
+  name: string
+  email: string
+}
+
 {
   pattern: '/users',
   method: 'POST',
   handle: async (req, res) => {
-    // Validation
-    if (!req.body.email || !req.body.name) {
+    const body = req.body as CreateUserBody
+
+    if (!body.email || !body.name) {
       res.writeHead(400, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({
         error: 'Validation failed',
@@ -635,10 +639,9 @@ universalApi({
       return
     }
 
-    // Create user
     const newUser = {
       id: generateId(),
-      ...req.body,
+      ...body,
       createdAt: new Date().toISOString()
     }
 
@@ -653,7 +656,89 @@ universalApi({
 }
 ```
 
-[Continue with remaining examples from original file...]
+### PUT - Update Resource
+
+```typescript
+{
+  pattern: '/users/{id}',
+  method: 'PUT',
+  handle: async (req, res) => {
+    const userId = req.params.id
+    const body = req.body as { name: string; email: string }
+
+    const index = database.users.findIndex(u => u.id === userId)
+
+    if (index === -1) {
+      res.writeHead(404, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'User not found' }))
+      return
+    }
+
+    database.users[index] = { id: userId, ...body }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify(database.users[index]))
+  }
+}
+```
+
+### DELETE - Remove Resource
+
+```typescript
+{
+  pattern: '/users/{id}',
+  method: 'DELETE',
+  handle: async (req, res) => {
+    const userId = req.params.id
+    const index = database.users.findIndex(u => u.id === userId)
+
+    if (index === -1) {
+      res.writeHead(404, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'User not found' }))
+      return
+    }
+
+    database.users.splice(index, 1)
+
+    res.writeHead(204)
+    res.end()
+  }
+}
+```
+
+### Simulating Errors
+
+```typescript
+{
+  pattern: '/unstable',
+  method: 'GET',
+  handle: async (req, res) => {
+    if (Math.random() < 0.3) {
+      res.writeHead(503, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'Service temporarily unavailable' }))
+      return
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ status: 'ok' }))
+  }
+}
+```
+
+### Disabling a Handler
+
+Use `disabled: true` to temporarily turn off a handler without removing it:
+
+```typescript
+{
+  pattern: '/users/{id}',
+  method: 'GET',
+  disabled: true,
+  handle: async (req, res) => {
+    // This handler is skipped; the request falls through to the next match
+  }
+}
+```
 
 ## Next Steps
 

@@ -19,7 +19,7 @@ export default defineConfig({
         {
           pattern: '/ws/game',
           heartbeat: 10000,
-          compression: { enabled: true },
+          perMessageDeflate: true,
 
           onMessage: (conn, data) => {
             switch (data.type) {

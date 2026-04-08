@@ -35,7 +35,7 @@ export default defineConfig({
                   username: data.username,
                   room: data.room || 'general'
                 }, {
-                  rooms: [data.room || 'general'],
+                  room: data.room || 'general',
                   includeSelf: false
                 })
                 break
@@ -47,7 +47,7 @@ export default defineConfig({
                   message: data.message,
                   timestamp: Date.now()
                 }, {
-                  rooms: [data.room || 'general'],
+                  room: data.room || 'general',
                   includeSelf: true
                 })
                 break
@@ -58,7 +58,7 @@ export default defineConfig({
                   type: 'user-left',
                   username: data.username,
                   room: data.room || 'general'
-                }, { rooms: [data.room || 'general'] })
+                }, { room: data.room || 'general' })
                 break
             }
           },

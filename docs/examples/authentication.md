@@ -37,9 +37,10 @@ export default defineConfig({
           pattern: '/login',
           method: 'POST',
           handle: async (req, res) => {
+            const body = req.body as { username: string; password: string }
             const user = users.find(
-              u => u.username === req.body.username &&
-                   u.password === req.body.password
+              u => u.username === body.username &&
+                   u.password === body.password
             )
 
             if (!user) {
@@ -80,19 +81,23 @@ export default defineConfig({
           pattern: '/ws/private',
 
           authenticate: async (req) => {
-            const url = new URL(req.url, 'ws://localhost')
+            const url = new URL(req.url!, 'ws://localhost')
             const token = url.searchParams.get('token')
-
+            if (!token) return false
             try {
-              const user = verifyToken(token)
-              return { success: true, data: { user } }
-            } catch (err) {
-              return { success: false, code: 4001, reason: 'Invalid token' }
+              verifyToken(token)
+              return true
+            } catch {
+              return false
             }
           },
 
-          onConnect: (conn) => {
-            conn.send({ type: 'authenticated', user: conn.authData.user })
+          onConnect: (conn, req) => {
+            // Store user data in conn.metadata for use in later handlers
+            const url = new URL(req.url!, 'ws://localhost')
+            const token = url.searchParams.get('token')!
+            conn.metadata.user = verifyToken(token)
+            conn.send({ type: 'authenticated', user: conn.metadata.user })
           }
         }
       ]

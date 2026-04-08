@@ -33,7 +33,7 @@ GET /api/users
 
 **Response:**
 - Status: `200 OK`
-- Headers: `Content-Type`, `Content-Length`, `X-Total-Elements`
+- Headers: `Content-Type`, `Content-Length`, `X-Total-Count`
 - Body: File content
 
 ### With Pagination
@@ -48,17 +48,9 @@ GET /api/users?limit=10&skip=20&sortBy=name&order=desc
 - ❌ Request cannot have body
 
 **Response:**
-```json
-{
-  "data": [...],
-  "pagination": {
-    "total": 100,
-    "skip": 20,
-    "limit": 10,
-    "returned": 10
-  }
-}
-```
+- Status: `200 OK`
+- Body: JSON array filtered/paginated
+- Headers: `X-Total-Count: 100`, `Content-Length: ...`
 
 ### Error (File Not Found)
 
@@ -92,7 +84,7 @@ HEAD /api/users
 
 **Response:**
 - Status: `200 OK`
-- Headers: `Content-Type`, `Content-Length`, `X-Total-Elements`
+- Headers: `Content-Type`, `Content-Length`, `X-Total-Count`
 - Body: (empty)
 
 ## POST Method
@@ -336,7 +328,7 @@ DELETE /api/users/123
 
 **Response:**
 - Status: `204 No Content`
-- Headers: `X-Deleted-Elements: 1`
+- Headers: `X-Deleted-Count: 1`
 - File removed
 
 ### Partial Delete (With Filters)
@@ -350,7 +342,7 @@ DELETE /api/users?status=inactive
 - If array becomes empty: deletes file
 - If items remain: updates file
 - Status: `204 No Content`
-- Headers: `X-Deleted-Elements: N`
+- Headers: `X-Deleted-Count: N`
 
 **Example:**
 
@@ -369,7 +361,7 @@ DELETE /api/users?status=inactive
   {"id": 1, "status": "active"}
 ]
 
-// Response Headers: X-Deleted-Elements: 2
+// Response Headers: X-Deleted-Count: 2
 ```
 
 ### Error: File Not Found
@@ -425,8 +417,8 @@ OPTIONS /api/users
 |--------|-------------|---------|
 | `Content-Type` | MIME type of response | `application/json` |
 | `Content-Length` | Size in bytes | `1024` |
-| `X-Total-Elements` | Total items (before pagination) | `150` |
-| `X-Deleted-Elements` | Number of deleted items | `5` |
+| `X-Total-Count` | Total items (before pagination) | `150` |
+| `X-Deleted-Count` | Number of deleted items | `5` |
 
 ### Request Headers
 

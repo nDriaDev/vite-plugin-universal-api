@@ -1,624 +1,201 @@
-# REST Handlers API Reference
+# REST Handlers — API Reference
 
-Complete API reference for REST handler configuration.
+## `UniversalApiRestHandler`
 
-## Handler Types
-
-REST handlers support two types:
-
-1. **Function Handler** - Custom logic with full control
-2. **File-System Handler** - Delegates to file-system with pattern matching and optional pre/post processing
-
-## Handler Configuration
+The union type for a single REST handler entry in the `handlers` array.
 
 ```typescript
-interface RestHandler {
-  pattern: string
-  method: HttpMethod
-  handle: HandlerFunction | 'FS'
-  delay?: number
-  preHandle?: PreHandleConfig      // Only for FS handlers
-  postHandle?: PostHandleFunction  // Only for FS handlers
-  pagination?: PaginationConfig    // Only for FS without postHandle
-  filters?: FilterConfig           // Only for FS without postHandle
+type UniversalApiRestHandler =
+  | UniversalApiRestFunctionHandler
+  | UniversalApiRestFsHandler
+```
+
+---
+
+## `UniversalApiRestFunctionHandler`
+
+A handler that executes custom logic and writes the response manually.
+
+```typescript
+interface UniversalApiRestFunctionHandler {
+  pattern:   string
+  method:    HttpMethod
+  handle:    UniversalApiSimpleHandler
+  disabled?: boolean
+  delay?:    number
+  parser?:   UniversalApiParser
 }
 ```
 
-## Properties
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `pattern` | `string` | ✅ | Ant-style path pattern (e.g. `/users/{id}`, `/files/**`) |
+| `method` | `HttpMethod` | ✅ | HTTP method: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD` |
+| `handle` | `UniversalApiSimpleHandler` | ✅ | Async function `(req, res) => Promise<void>`. Must write the response. |
+| `disabled` | `boolean` | — | If `true`, the handler is skipped. Default: `false` |
+| `delay` | `number` | — | Artificial delay in ms before executing the handler. Overrides the global `delay`. |
+| `parser` | `UniversalApiParser` | — | Request parser configuration for this handler. Overrides the global `parser`. |
 
-### pattern
+> **Note:** `pagination` and `filters` are **not** available on function handlers — they only apply to FS handlers. Implement pagination and filtering manually inside your `handle` function if needed.
 
-**Type:** `string`
+---
 
-Ant-style path pattern for matching requests.
+## `UniversalApiRestFsHandler`
 
-[Pattern examples remain the same as before...]
-
-### method
-
-**Type:** `HttpMethod`
-
-[Method documentation remains the same...]
-
-### handle
-
-**Type:** `HandlerFunction | 'FS'`
-
-Request handler - either a custom function or file-system delegation.
-
-#### Function Handler
-
-[Function handler documentation remains the same...]
-
-#### File-System Handler
-
-**Type:** `'FS'`
-
-Delegates to file-system with automatic file lookup.
-
-[FS handler basic documentation remains the same...]
-
-### preHandle
-
-**Type:** `PreHandleConfig` (optional)
-
-**Only available for:** File-System handlers (`handle: 'FS'`)
-
-Pre-processing configuration for URL transformation applied **before** file lookup.
-
-**Type Definition:**
+A handler that delegates request processing to the File-System API, with optional URL transformation (`preHandle`) or manual response control (`postHandle`).
 
 ```typescript
-interface PreHandleConfig {
-  transform:
-    | ((url: string) => string)
-    | Array<{ searchValue: string; replaceValue: string }>
+interface UniversalApiRestFsHandler {
+  pattern:     string
+  method:      HttpMethod
+  handle:      'FS'
+  disabled?:   boolean
+  delay?:      number
+  parser?:     UniversalApiParser
+  pagination?: "none" | { inclusive?: UniversalApiPagination, exclusive?: never } | { inclusive?: never, exclusive?: UniversalApiPagination }
+filters?: "none" | { inclusive?: UniversalApiFilter, exclusive?: never } | { inclusive?: never, exclusive?: UniversalApiFilter }
+  preHandle?:  UniversalApiPreHandle
+  postHandle?: UniversalApiPostHandle
 }
 ```
 
-**Function Transform:**
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `pattern` | `string` | ✅ | Ant-style path pattern |
+| `method` | `HttpMethod` | ✅ | HTTP method |
+| `handle` | `'FS'` | ✅ | Literal string `'FS'` — delegates to File-System routing |
+| `disabled` | `boolean` | — | If `true`, the handler is skipped. Default: `false` |
+| `delay` | `number` | — | Artificial delay in ms. Overrides the global `delay`. |
+| `parser` | `UniversalApiParser` | — | Request parser for this handler. Overrides the global `parser`. |
+| `pagination` | `UniversalApiPagination \| 'none'` | — | Pagination config. `'none'` disables the global pagination. Not available when `postHandle` is set. |
+| `filters` | `UniversalApiFilter \| 'none'` | — | Filter config. `'none'` disables the global filters. Not available when `postHandle` is set. |
+| `preHandle` | `UniversalApiPreHandle` | — | URL transformation applied before the file lookup. |
+| `postHandle` | `UniversalApiPostHandle` | — | Callback invoked after the file lookup, receiving the file content. Bypasses all automatic processing. |
+
+---
+
+## `UniversalApiPreHandle`
+
+Transforms the request URL before the file lookup.
 
 ```typescript
-{
-  pattern: '/api/v2/**',
-  method: 'GET',
-  handle: 'FS',
-  preHandle: {
-    transform: (url) => url.replace('/v2/', '/v1/')
-  }
+interface UniversalApiPreHandle {
+  transform: UniversalApiPreHandleTransform | UniversalApiPreHandleTransform[]
 }
 
-// GET /api/v2/users → Looks for mock/api/v1/users.json
+type UniversalApiPreHandleTransform =
+  | ((url: string) => string)
+  | { searchValue: string; replaceValue: string }
 ```
 
-**Array Transform (multiple replacements):**
+When `transform` is an array, each replacement is applied in order to the same URL string. `searchValue` is a plain string and replaces only the **first** occurrence (matching `String.prototype.replace` semantics).
+
+---
+
+## `UniversalApiPostHandle`
+
+Called after the file lookup, regardless of the HTTP method. Receives the current file content as a string or `null` if no file was found.
 
 ```typescript
-{
-  pattern: '/api/**',
-  method: 'GET',
-  handle: 'FS',
-  preHandle: {
-    transform: [
-      { searchValue: '/api/', replaceValue: '/data/' },
-      { searchValue: '-', replaceValue: '_' },
-      { searchValue: '.json', replaceValue: '' }
-    ]
-  }
-}
-
-// GET /api/user-profile.json
-// → Transforms to /data/user_profile
-// → Looks for mock/data/user_profile.json
-```
-
-**Use Cases:**
-
-- URL versioning (`/v2/` → `/v1/`)
-- Path normalization (remove trailing slashes)
-- Prefix replacements (`/api/` → `/data/`)
-- Character substitutions (`-` → `_`)
-- Extension handling
-
-### postHandle
-
-**Type:** `PostHandleFunction` (optional)
-
-**Only available for:** File-System handlers (`handle: 'FS'`)
-
-Post-processing function that receives file content and can modify the response **after** file is loaded.
-
-**Type Definition:**
-
-```typescript
-type PostHandleFunction = (
-  req: ApiWsRestFsRequest,
-  res: ServerResponse,
+type UniversalApiPostHandle = (
+  req:  UniversalApiRequest<any>,
+  res:  ServerResponse,
   data: string | null
-) => void | Promise<void>
+) => Promise<void> | void
 ```
 
-**Parameters:**
+| Parameter | Description |
+|-----------|-------------|
+| `req` | The incoming request with parsed `body`, `params`, `query`, and `files` |
+| `res` | The Node.js `ServerResponse`. Must be used to write and end the response. |
+| `data` | The file content as a UTF-8 string, or `null` if the file was not found on disk. JSON files are returned as their raw JSON string. Non-JSON files (images, text, binary, etc.) are also returned as a UTF-8 string read from disk. For non-`GET` methods, this is the **pre-existing** file content *before* any write or delete would have occurred. |
 
-- `req` - Request object with params, query, body
-- `res` - ServerResponse for sending the response
-- `data` - File content as string, or `null` if file not found
+> ⚠️ When `postHandle` is defined, the plugin does **not** perform any automatic file write, delete, pagination, or filtering. The handler is fully responsible for the response and, if needed, any file I/O.
 
-**Important:** When using `postHandle`:
-- ❌ `pagination` is **NOT available** (must implement manually)
-- ❌ `filters` are **NOT available** (must implement manually)
-- ✅ You have **full control** over the response
+---
 
-**Example - Response Envelope:**
+## `UniversalApiSimpleHandler`
 
 ```typescript
-{
-  pattern: '/users/{id}',
-  method: 'GET',
-  handle: 'FS',
-  postHandle: async (req, res, data) => {
-    if (!data) {
-      res.writeHead(404, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ error: 'User not found' }))
-      return
-    }
-
-    const envelope = {
-      success: true,
-      data: JSON.parse(data),
-      timestamp: Date.now(),
-      requestId: req.headers['x-request-id']
-    }
-
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify(envelope))
-  }
-}
+type UniversalApiSimpleHandler<TBody = unknown> = (
+  req: UniversalApiRequest<TBody>,
+  res: ServerResponse
+) => Promise<void> | void
 ```
 
-**Example - Data Transformation:**
+---
+
+## `UniversalApiRequest<TBody>`
+
+Extends Node.js `IncomingMessage` with parsed fields populated after the request parser runs.
 
 ```typescript
-{
-  pattern: '/products/{id}',
-  method: 'GET',
-  handle: 'FS',
-  postHandle: async (req, res, data) => {
-    if (!data) {
-      res.writeHead(404)
-      res.end()
-      return
-    }
-
-    const product = JSON.parse(data)
-
-    // Add computed fields
-    product.discountedPrice = product.price * 0.9
-    product.inStock = product.stock > 0
-
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify(product))
-  }
+interface UniversalApiRequest<TBody = unknown> extends IncomingMessage {
+  body:   TBody | null
+  files:  UploadedFile[] | null
+  params: Record<string, string> | null
+  query:  URLSearchParams
 }
 ```
 
-**Example - Custom 404:**
+| Field | Description |
+|-------|-------------|
+| `body` | Parsed request body. Type depends on `Content-Type`: JSON → object, `text/*` → string, `application/x-www-form-urlencoded` → `Record<string, string>`, `multipart/form-data` (non-file fields) → `Record<string, any>`. `null` if no body was sent. |
+| `files` | Array of uploaded files from `multipart/form-data`. `null` if no files were uploaded. |
+| `params` | Path parameters extracted from the pattern (e.g. `{ id: "123" }` from `/users/{id}`). `null` if the pattern has no parameters. |
+| `query` | Parsed query string as `URLSearchParams`. Empty if no query string is present. |
+
+---
+
+## `UploadedFile`
 
 ```typescript
-{
-  pattern: '/api/**',
-  method: 'GET',
-  handle: 'FS',
-  postHandle: async (req, res, data) => {
-    if (!data) {
-      const error = {
-        error: {
-          code: 'NOT_FOUND',
-          message: `Resource '${req.url}' does not exist`,
-          timestamp: Date.now()
-        }
-      }
-      res.writeHead(404, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify(error))
-      return
-    }
-
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(data)
-  }
+interface UploadedFile {
+  name:        string
+  content:     Buffer<ArrayBuffer>
+  contentType: string
 }
 ```
 
-**Use Cases:**
+---
 
-- Wrapping responses in envelopes
-- Adding metadata (timestamps, request IDs)
-- Data transformation and computed fields
-- Custom error responses
-- Logging and analytics
-- Content-type detection
-- Response validation
-
-### delay
-
-[Delay documentation remains the same...]
-
-### pagination
-
-**Type:** `PaginationConfig` (optional)
-
-**Only applies to:**
-- ✅ File-System handlers (`handle: 'FS'`)
-- ✅ WITHOUT `postHandle` (mutually exclusive)
-- ✅ Files containing JSON arrays
-
-⚠️ **Not available when using `postHandle`** - you must implement pagination manually.
-
-[Rest of pagination documentation remains the same...]
-
-### filters
-
-**Type:** `FilterConfig` (optional)
-
-**Only applies to:**
-- ✅ File-System handlers (`handle: 'FS'`)
-- ✅ WITHOUT `postHandle` (mutually exclusive)
-- ✅ Files containing JSON arrays
-
-⚠️ **Not available when using `postHandle`** - you must implement filters manually.
-
-[Rest of filters documentation remains the same...]
-
-## Complete Examples
-
-### Function Handler Example
-
-[Function handler example remains the same...]
-
-### FS Handler with preHandle
+## `HttpMethod`
 
 ```typescript
-{
-  pattern: '/api/v2/users/{id}',
-  method: 'GET',
-  handle: 'FS',
-  preHandle: {
-    transform: (url) => url.replace('/v2/', '/v1/')
-  }
-}
-
-// Request: GET /api/v2/users/123
-// preHandle transforms to: /api/v1/users/123
-// Looks for: mock/api/v1/users/123.json
-// Response: File content
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD'
 ```
 
-### FS Handler with postHandle
+---
 
-```typescript
-{
-  pattern: '/users/{id}',
-  method: 'GET',
-  handle: 'FS',
-  postHandle: async (req, res, data) => {
-    if (!data) {
-      res.writeHead(404)
-      res.end(JSON.stringify({ error: 'Not found' }))
-      return
-    }
+## File Lookup Algorithm
 
-    const user = JSON.parse(data)
+When `handle: 'FS'` is used (with or without `preHandle`), the plugin resolves the file to serve with the following steps:
 
-    // Enhance response
-    const response = {
-      success: true,
-      data: user,
-      metadata: {
-        cached: false,
-        timestamp: Date.now()
-      }
-    }
+1. Strip the `endpointPrefix` from the request path to obtain the relative path.
+2. Resolve the absolute path by joining `fsDir` with the relative path.
+3. **Exact file match** — if a file exists at that path, serve it.
+4. **Directory index** — if a directory exists at that path, look for `index.json` inside it and serve it if found.
+5. **Extension resolution** — if neither a file nor a directory exists, list the parent directory and serve the first file whose name starts with the last path segment.
+6. If none of the above match, respond with `404`.
 
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify(response))
-  }
-}
-```
+> Only JSON files are eligible for pagination and filtering. Non-JSON files (images, text, XML, etc.) are served as-is for `GET`/`HEAD` requests via a streaming response.
 
-### FS Handler with preHandle AND postHandle
+---
 
-```typescript
-{
-  pattern: '/api/v2/products/{id}',
-  method: 'GET',
-  handle: 'FS',
+## Handler Resolution Order
 
-  // Transform URL before file lookup
-  preHandle: {
-    transform: [
-      { searchValue: '/v2/', replaceValue: '/v1/' },
-      { searchValue: 'products', replaceValue: 'items' }
-    ]
-  },
+For each incoming request, the plugin iterates over the `handlers` array in declaration order and uses the **first** entry where all of the following are true:
 
-  // Process response after file is loaded
-  postHandle: async (req, res, data) => {
-    if (!data) {
-      res.writeHead(404)
-      res.end()
-      return
-    }
+- The `pattern` matches the request path (after prefix removal).
+- The `method` matches the request HTTP method.
+- `disabled` is not `true`.
 
-    const product = JSON.parse(data)
+If no handler matches, the request falls through to the bare File-System API (if `fsDir` is configured). If that also produces no match, the plugin responds with `404` or forwards to `next()` depending on the `noHandledRestFsRequestsAction` option.
 
-    // Add v2-specific fields
-    product.version = 'v2'
-    product.legacy = false
-    product.discountAvailable = product.price > 100
+---
 
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify(product))
-  }
-}
-
-// Request: GET /api/v2/products/42
-// preHandle: /api/v2/products/42 → /api/v1/items/42
-// File lookup: mock/api/v1/items/42.json
-// postHandle: Adds version fields
-// Response: Enhanced product object
-```
-
-### FS Handler with Pagination (no postHandle)
-
-```typescript
-{
-  pattern: '/users',
-  method: 'GET',
-  handle: 'FS',
-  pagination: {
-    type: 'query-param',
-    limit: 'limit',
-    skip: 'skip',
-    sort: 'sortBy',
-    order: 'order'
-  }
-}
-
-// Note: pagination ONLY works without postHandle
-// If you need both, implement pagination manually in postHandle
-```
-
-### POST with postHandle
-
-```typescript
-{
-  pattern: '/users',
-  method: 'POST',
-  handle: 'FS',
-  postHandle: async (req, res, data) => {
-    // data = written file content (or null on error)
-    if (!data) {
-      res.writeHead(500)
-      res.end(JSON.stringify({ error: 'Failed to create' }))
-      return
-    }
-
-    const created = JSON.parse(data)
-
-    res.writeHead(201, {
-      'Content-Type': 'application/json',
-      'Location': `/api/users/${created.id}`
-    })
-    res.end(JSON.stringify({
-      success: true,
-      data: created
-    }))
-  }
-}
-```
-
-### DELETE with postHandle
-
-```typescript
-{
-  pattern: '/users/{id}',
-  method: 'DELETE',
-  handle: 'FS',
-  postHandle: async (req, res, data) => {
-    if (data) {
-      // File was deleted
-      console.log(`Deleted user ${req.params.id}`)
-      res.writeHead(204)
-      res.end()
-    } else {
-      // File not found
-      res.writeHead(404)
-      res.end(JSON.stringify({ error: 'User not found' }))
-    }
-  }
-}
-```
-
-## Handler Configuration Matrix
-
-| Feature | Function Handler | FS Handler | FS + preHandle | FS + postHandle | FS + preHandle + postHandle |
-|---------|------------------|------------|----------------|-----------------|----------------------------|
-| Custom logic | ✅ Full control | ❌ No | ❌ No | ✅ Response only | ✅ Response only |
-| Pattern matching | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes |
-| URL transformation | ❌ No | ❌ No | ✅ Yes | ❌ No | ✅ Yes |
-| Response processing | ✅ Full control | ❌ No | ❌ No | ✅ Yes | ✅ Yes |
-| Automatic pagination | ❌ Manual | ✅ Yes | ✅ Yes | ❌ Manual | ❌ Manual |
-| Automatic filters | ❌ Manual | ✅ Yes | ✅ Yes | ❌ Manual | ❌ Manual |
-| File lookup | ❌ Manual | ✅ Auto | ✅ Auto | ✅ Auto | ✅ Auto |
-| Use case | Complex logic | Simple files | URL mapping | Response wrapping | URL mapping + wrapping |
-
-## Best Practices
-
-### 1. Choose the Right Handler Type
-
-```typescript
-// ✅ Function Handler - Complex logic
-{
-  pattern: '/search',
-  method: 'POST',
-  handle: async (req, res) => {
-    const results = await complexSearch(req.body)
-    res.end(JSON.stringify(results))
-  }
-}
-
-// ✅ FS Handler - Simple file serving
-{
-  pattern: '/users/{id}',
-  method: 'GET',
-  handle: 'FS'
-}
-
-// ✅ FS + preHandle - URL transformation
-{
-  pattern: '/api/v2/**',
-  method: 'GET',
-  handle: 'FS',
-  preHandle: {
-    transform: (url) => url.replace('/v2/', '/v1/')
-  }
-}
-
-// ✅ FS + postHandle - Response wrapping
-{
-  pattern: '/users/{id}',
-  method: 'GET',
-  handle: 'FS',
-  postHandle: async (req, res, data) => {
-    if (!data) {
-      res.writeHead(404)
-      res.end()
-      return
-    }
-    const envelope = { success: true, data: JSON.parse(data) }
-    res.end(JSON.stringify(envelope))
-  }
-}
-```
-
-### 2. preHandle for URL Transformations Only
-
-Use `preHandle` **only** for transforming URLs before file lookup:
-
-```typescript
-// ✅ Good - URL transformation
-preHandle: {
-  transform: (url) => url.replace('/api/', '/data/')
-}
-
-// ❌ Bad - Don't use preHandle for response processing
-preHandle: {
-  transform: (url) => {
-    // Don't do this in preHandle!
-    fetchFromDatabase()
-    return url
-  }
-}
-```
-
-### 3. postHandle for Response Processing
-
-Use `postHandle` for processing responses:
-
-```typescript
-// ✅ Good - Response wrapping/transformation
-postHandle: async (req, res, data) => {
-  if (!data) {
-    res.writeHead(404)
-    res.end()
-    return
-  }
-
-  const enhanced = {
-    data: JSON.parse(data),
-    timestamp: Date.now()
-  }
-
-  res.end(JSON.stringify(enhanced))
-}
-```
-
-### 4. pagination/filters vs postHandle
-
-You cannot use both - choose based on needs:
-
-```typescript
-// ✅ Automatic pagination - simpler
-{
-  handle: 'FS',
-  pagination: { type: 'query-param', ... }
-}
-
-// ✅ Manual in postHandle - more control
-{
-  handle: 'FS',
-  postHandle: async (req, res, data) => {
-    if (!data) return
-
-    const items = JSON.parse(data)
-    const limit = parseInt(req.query.get('limit') || '10')
-    const skip = parseInt(req.query.get('skip') || '0')
-
-    const paginated = items.slice(skip, skip + limit)
-
-    res.writeHead(200, { 'X-Total': items.length })
-    res.end(JSON.stringify(paginated))
-  }
-}
-```
-
-## TypeScript Types
-
-```typescript
-import type {
-  ApiWsRestFsRequest,
-  RestHandler,
-  PreHandleConfig,
-  PostHandleFunction,
-  PaginationConfig,
-  FilterConfig
-} from '@ndriadev/vite-plugin-universal-mock-api'
-
-// FS handler with preHandle
-const handler1: RestHandler = {
-  pattern: '/api/**',
-  method: 'GET',
-  handle: 'FS',
-  preHandle: {
-    transform: (url: string) => url.replace('/api/', '/data/')
-  }
-}
-
-// FS handler with postHandle
-const handler2: RestHandler = {
-  pattern: '/users/{id}',
-  method: 'GET',
-  handle: 'FS',
-  postHandle: async (
-    req: ApiWsRestFsRequest,
-    res: ServerResponse,
-    data: string | null
-  ) => {
-    if (!data) {
-      res.writeHead(404)
-      res.end()
-      return
-    }
-
-    res.writeHead(200)
-    res.end(data)
-  }
-}
-```
+For more details, see [REST Handlers Guide](/guide/rest-handlers).
 
 ## See Also
 
-- [REST Handlers Guide](/guide/rest-handlers) - Detailed usage guide with more examples
-- [File-System API](/guide/file-system-api) - File-based routing
-- [Pagination & Filters](/guide/pagination-filters) - Data querying
-- [Middleware](/guide/middleware) - Request processing
+- [WebSocket API Reference](/api/websocket-handlers) — tutorial with examples

@@ -5,9 +5,9 @@ Middleware functions allow you to intercept and process requests before they rea
 ## Overview
 
 Middleware runs in order:
-1. **Handler Middlewares** - Run before all REST handlers
-2. **Your Handler** - Your custom endpoint logic
-3. **Error Middlewares** - Catch and handle errors
+1. **Handler Middlewares** — Run before all REST handlers
+2. **Your Handler** — Your custom endpoint logic
+3. **Error Middlewares** — Catch and handle errors
 
 ## Handler Middlewares
 
@@ -45,7 +45,6 @@ export default defineConfig({
           pattern: '/users',
           method: 'GET',
           handle: async (req, res) => {
-            // Middleware already ran
             res.writeHead(200)
             res.end('Users')
           }
@@ -59,17 +58,39 @@ export default defineConfig({
 ### Middleware Function Signature
 
 ```typescript
-type MiddlewareFunction = (
-  req: UniversalApiRequest,
+type UniversalApiMiddleware<TBody = unknown> = (
+  req: UniversalApiRequest<TBody>,
   res: ServerResponse,
   next: () => void
 ) => void | Promise<void>
 ```
 
+The generic `TBody` parameter lets you type the request body when you know its shape:
+
+```typescript
+import type { UniversalApiMiddleware } from '@ndriadev/vite-plugin-universal-api'
+
+interface AuthenticatedBody {
+  currentUser: { id: string; role: string }
+}
+
+// Typed middleware — body shape is known
+const authMiddleware: UniversalApiMiddleware<AuthenticatedBody> = async (req, res, next) => {
+  const token = req.headers.authorization?.replace('Bearer ', '')
+  if (!token) {
+    res.writeHead(401, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: 'Unauthorized' }))
+    return
+  }
+  req.body.currentUser = await verifyToken(token)
+  next()
+}
+```
+
 **Parameters:**
-- `req` - Request object with parsed body, params, query
-- `res` - Node.js ServerResponse object
-- `next` - Call to proceed to next middleware/handler
+- `req` — Request object with parsed `body`, `params`, `query`, `files`
+- `res` — Node.js `ServerResponse`
+- `next` — Call to proceed to next middleware/handler
 
 ## Common Middleware Patterns
 
@@ -87,25 +108,46 @@ handlerMiddlewares: [
     }
 
     try {
-      // Verify token and attach user to request
-      req.body.user = await verifyToken(token)
-      next()  // Proceed to handler
-    } catch (err) {
+      const user = await verifyToken(token)
+      // Cast to any to attach a user to the body object
+      ;(req.body as any).user = user
+      next()
+    } catch {
       res.writeHead(401, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: 'Invalid token' }))
-      // Don't call next()
     }
   }
 ]
 ```
+
+::: tip Typed body after auth
+If your handlers always expect an authenticated body, declare a shared body type and use it in both middleware and handler:
+
+```typescript
+import type { UniversalApiMiddleware, UniversalApiSimpleHandler } from '@ndriadev/vite-plugin-universal-api'
+
+interface AuthBody { user: { id: string; role: string } }
+
+const authMiddleware: UniversalApiMiddleware<AuthBody> = async (req, res, next) => {
+  const user = await verifyToken(req.headers.authorization!)
+  req.body.user = user
+  next()
+}
+
+const usersHandler: UniversalApiSimpleHandler<AuthBody> = async (req, res) => {
+  const { user } = req.body  // fully typed ✅
+  res.writeHead(200, { 'Content-Type': 'application/json' })
+  res.end(JSON.stringify({ requestedBy: user.id }))
+}
+```
+:::
 
 ### Request Validation
 
 ```typescript
 handlerMiddlewares: [
   async (req, res, next) => {
-    // Only validate POST/PUT/PATCH
-    if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+    if (['POST', 'PUT', 'PATCH'].includes(req.method!)) {
       if (!req.body || typeof req.body !== 'object') {
         res.writeHead(400, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ error: 'Invalid request body' }))
@@ -126,7 +168,6 @@ handlerMiddlewares: [
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
-    // Handle preflight
     if (req.method === 'OPTIONS') {
       res.writeHead(204)
       res.end()
@@ -141,20 +182,16 @@ handlerMiddlewares: [
 ### Rate Limiting
 
 ```typescript
-const rateLimits = new Map()
+const rateLimits = new Map<string, number[]>()
 
 handlerMiddlewares: [
   async (req, res, next) => {
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress
+    const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? 'unknown')
     const now = Date.now()
-    const windowMs = 60000 // 1 minute
+    const windowMs = 60_000 // 1 minute
     const maxRequests = 100
 
-    if (!rateLimits.has(ip)) {
-      rateLimits.set(ip, [])
-    }
-
-    const requests = rateLimits.get(ip).filter(time => now - time < windowMs)
+    const requests = (rateLimits.get(ip) ?? []).filter(t => now - t < windowMs)
 
     if (requests.length >= maxRequests) {
       res.writeHead(429, { 'Content-Type': 'application/json' })
@@ -177,7 +214,7 @@ import { randomUUID } from 'crypto'
 handlerMiddlewares: [
   async (req, res, next) => {
     const requestId = randomUUID()
-    req.body.requestId = requestId
+    ;(req.body as any).requestId = requestId
     res.setHeader('X-Request-ID', requestId)
     next()
   }
@@ -196,10 +233,7 @@ errorMiddlewares: [
     console.error('Error:', err)
 
     res.writeHead(500, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({
-      error: 'Internal server error',
-      requestId: req.body.requestId
-    }))
+    res.end(JSON.stringify({ error: 'Internal server error' }))
   }
 ]
 ```
@@ -207,12 +241,23 @@ errorMiddlewares: [
 ### Error Handler Signature
 
 ```typescript
-type ErrorHandlerFunction = (
-  err: Error,
-  req: UniversalApiRequest,
+type UniversalApiErrorMiddleware<TBody = unknown> = (
+  err: any,
+  req: UniversalApiRequest<TBody> | IncomingMessage,
   res: ServerResponse,
-  next: (err?: Error) => void
-) => void
+  next: (err?: any) => void
+) => void | Promise<void>
+```
+
+Note that `req` may be either a fully parsed `UniversalApiRequest` or a raw `IncomingMessage`, depending on when the error occurred in the pipeline. Guard accordingly:
+
+```typescript
+errorMiddlewares: [
+  (err, req, res, next) => {
+    const body = 'body' in req ? req.body : null
+    // ...
+  }
+]
 ```
 
 ### Multiple Error Handlers
@@ -223,10 +268,7 @@ errorMiddlewares: [
   (err, req, res, next) => {
     if (err.name === 'ValidationError') {
       res.writeHead(400, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({
-        error: 'Validation failed',
-        details: err.details
-      }))
+      res.end(JSON.stringify({ error: 'Validation failed', details: err.details }))
       return
     }
 
@@ -239,15 +281,11 @@ errorMiddlewares: [
     next(err)  // Pass to next error handler
   },
 
-  // Generic error handler (catch-all)
+  // Generic catch-all
   (err, req, res, next) => {
     console.error('Unhandled error:', err)
-
     res.writeHead(500, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({
-      error: 'Internal server error',
-      message: process.env.NODE_ENV === 'development' ? err.message : undefined
-    }))
+    res.end(JSON.stringify({ error: 'Internal server error' }))
   }
 ]
 ```
@@ -267,7 +305,7 @@ Handler (if match found)
   ↓
 Response
 
-(If error occurs)
+(If error occurs anywhere above)
   ↓
 errorMiddlewares[0]
   ↓
@@ -282,10 +320,21 @@ Response
 
 ```typescript
 import { defineConfig } from 'vite'
-// import mockApi from '@ndriadev/vite-plugin-universal-api' //Default export
-import { universalApi } from '@ndriadev/vite-plugin-universal-api' // Named export
+import { universalApi } from '@ndriadev/vite-plugin-universal-api'
+import type { UniversalApiSimpleHandler } from '@ndriadev/vite-plugin-universal-api'
 
-const users = new Map()
+interface AppBody {
+  currentUser?: { id: string; role: string }
+  requestId?: string
+}
+
+const users = new Map<string, { id: string; role: string }>()
+
+const getUsers: UniversalApiSimpleHandler<AppBody> = async (req, res) => {
+  const { currentUser } = req.body  // typed ✅
+  res.writeHead(200, { 'Content-Type': 'application/json' })
+  res.end(JSON.stringify({ requestedBy: currentUser?.id, users: [...users.values()] }))
+}
 
 export default defineConfig({
   plugins: [
@@ -313,62 +362,44 @@ export default defineConfig({
           next()
         },
 
-        // 3. Authentication (skip for public endpoints)
+        // 3. Request ID
+        async (req, res, next) => {
+          ;(req.body as AppBody).requestId = crypto.randomUUID()
+          next()
+        },
+
+        // 4. Authentication
         async (req, res, next) => {
           const publicPaths = ['/api/login', '/api/register']
-          if (publicPaths.some(path => req.url.startsWith(path))) {
+          if (publicPaths.some(p => req.url!.startsWith(p))) {
             next()
             return
           }
 
           const token = req.headers.authorization?.replace('Bearer ', '')
-          if (!token) {
+          const user = token ? users.get(token) : undefined
+          if (!user) {
             res.writeHead(401, { 'Content-Type': 'application/json' })
             res.end(JSON.stringify({ error: 'Unauthorized' }))
             return
           }
 
-          const user = users.get(token)
-          if (!user) {
-            res.writeHead(401, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify({ error: 'Invalid token' }))
-            return
-          }
-
-          req.body.currentUser = user
-          next()
-        },
-
-        // 4. Request timing
-        async (req, res, next) => {
-          const start = Date.now()
-
-          // Override res.end to log timing
-          const originalEnd = res.end.bind(res)
-          res.end = function(...args) {
-            console.log(`Request took ${Date.now() - start}ms`)
-            return originalEnd(...args)
-          }
-
+          ;(req.body as AppBody).currentUser = user
           next()
         }
       ],
 
       errorMiddlewares: [
-        // Custom error handler
         (err, req, res, next) => {
           console.error('Error:', err)
-
           if (err.name === 'ValidationError') {
             res.writeHead(400, { 'Content-Type': 'application/json' })
             res.end(JSON.stringify({ error: err.message }))
             return
           }
-
           next(err)
         },
 
-        // Generic error handler
         (err, req, res, next) => {
           res.writeHead(500, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ error: 'Internal server error' }))
@@ -379,11 +410,7 @@ export default defineConfig({
         {
           pattern: '/users',
           method: 'GET',
-          handle: async (req, res) => {
-            // req.body.currentUser is available from middleware
-            res.writeHead(200, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify({ users: Array.from(users.values()) }))
-          }
+          handle: getUsers
         }
       ]
     })
@@ -398,7 +425,7 @@ export default defineConfig({
 ⚠️ **Handler middlewares only run for handlers in the `handlers` array**
 
 They do NOT run for:
-- Pure file-system requests (when no handler matches)
+- Pure file-system requests (when no REST handler matches)
 - WebSocket connections
 
 ### Calling next()
@@ -409,40 +436,39 @@ Always call `next()` to continue the chain:
 // ✅ Good
 async (req, res, next) => {
   doSomething()
-  next()  // Continue
+  next()
 }
 
-// ✅ Good - early return
+// ✅ Good — early return on error
 async (req, res, next) => {
   if (error) {
     res.writeHead(400)
     res.end('Error')
     return  // Don't call next
   }
-  next()  // Continue
-}
-
-// ❌ Bad - forgot next()
-async (req, res, next) => {
-  doSomething()
-  // Request hangs!
-}
-```
-
-### Async Middleware
-
-Can be async or sync:
-
-```typescript
-// Async
-async (req, res, next) => {
-  await doAsyncThing()
   next()
 }
 
-// Sync
-(req, res, next) => {
-  doSyncThing()
+// ❌ Bad — request hangs
+async (req, res, next) => {
+  doSomething()
+  // Forgot next()!
+}
+```
+
+### Typed Body
+
+The `body` field on `UniversalApiRequest` is typed as `TBody = unknown` by default. Inside middleware, use a cast when attaching data that subsequent handlers will consume:
+
+```typescript
+;(req.body as MyBodyShape).myField = value
+```
+
+Or declare the middleware with an explicit generic:
+
+```typescript
+const myMiddleware: UniversalApiMiddleware<MyBodyShape> = async (req, res, next) => {
+  req.body.myField = value  // ✅ typed
   next()
 }
 ```
@@ -454,9 +480,9 @@ async (req, res, next) => {
 Place middleware in logical order:
 1. Logging (first)
 2. CORS
-3. Authentication
-4. Validation
-5. Business logic
+3. Request ID
+4. Authentication
+5. Validation / business logic
 
 ### 2. Early Returns
 
@@ -499,6 +525,6 @@ async (req, res, next) => {
 
 ## Next Steps
 
-- [REST Handlers](/guide/rest-handlers) - Handler configuration
-- [Examples](/examples/authentication) - Authentication example
-- [API Reference](/api/) - Complete configuration
+- [REST Handlers](/guide/rest-handlers) — Handler configuration
+- [Examples — Authentication](/examples/authentication) — Full auth example
+- [API Reference](/api/) — Complete configuration

@@ -240,7 +240,7 @@ universalApi({
       res.setHeader('Access-Control-Allow-Origin', '*')
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH')
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-      res.setHeader('Access-Control-Expose-Headers', 'X-Total-Elements, X-Deleted-Elements')
+      res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count, X-Deleted-Count')
 
       if (req.method === 'OPTIONS') {
         res.writeHead(204)

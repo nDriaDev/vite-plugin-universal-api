@@ -1,6 +1,6 @@
 # File-System API
 
-The File-System API is the simplest way to serve mock data. Just point to a directory and VitePress automatically serves files as API endpoints.
+The File-System API is the simplest way to serve mock data. Just point to a directory and plugin automatically serves files as API endpoints.
 
 ## Overview
 
@@ -198,7 +198,6 @@ universalApi({
         },
         {
           key: 'minAge',
-          field: 'age',
           valueType: 'number',
           comparison: 'gte'
         }
@@ -215,14 +214,15 @@ GET /api/users?status=active&minAge=18
 
 **Comparison Operators:**
 - `eq` - equals
-- `neq` - not equals
+- `ne` - not equals
 - `gt` - greater than
 - `gte` - greater than or equal
 - `lt` - less than
 - `lte` - less than or equal
 - `in` - value in array
 - `nin` - value not in array
-- `contains` - string contains (case-insensitive)
+- `regex` - regular expression match (use `regexFlags` for flags, e.g. `"i"` for case-insensitive)
+
 
 ## File Upload
 

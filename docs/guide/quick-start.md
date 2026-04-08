@@ -354,7 +354,7 @@ universalApi({
 
             conn.broadcast(
               { type: 'user-joined', username: data.username },
-              { rooms: [room], includeSelf: false }
+              { room: room, includeSelf: false }
             )
             break
 
@@ -366,7 +366,7 @@ universalApi({
                 message: data.message,
                 timestamp: Date.now()
               },
-              { rooms: [data.room], includeSelf: true }
+              { room: data.room, includeSelf: true }
             )
             break
 
@@ -374,7 +374,7 @@ universalApi({
             conn.leaveRoom(data.room)
             conn.broadcast(
               { type: 'user-left', username: data.username },
-              { rooms: [data.room] }
+              { room: data.room }
             )
             break
         }
@@ -393,41 +393,31 @@ universalApi({
     {
       pattern: '/ws/private',
 
-      // Authenticate on connection
+      // Authenticate on connection — return boolean
       authenticate: async (req) => {
         const token = new URL(req.url!, 'ws://localhost').searchParams.get('token')
-
-        if (!token) {
-          return {
-            success: false,
-            code: 4001,
-            reason: 'No token provided'
-          }
-        }
-
+        if (!token) return false
         try {
-          const user = await verifyToken(token)
-          return { success: true, data: { user } }
-        } catch (err) {
-          return {
-            success: false,
-            code: 4002,
-            reason: 'Invalid token'
-          }
+          await verifyToken(token)
+          return true
+        } catch {
+          return false
         }
       },
 
-      onConnect: (conn) => {
-        // conn.authData contains the user from authenticate
+      onConnect: (conn, req) => {
+        // Store user data in conn.metadata — available in all subsequent handlers
+        const token = new URL(req.url!, 'ws://localhost').searchParams.get('token')!
+        conn.metadata.user = verifyToken(token)
         conn.send({
           type: 'authenticated',
-          user: conn.authData.user
+          user: conn.metadata.user
         })
       },
 
       onMessage: (conn, data) => {
-        // Use conn.authData.user for authorization
-        if (hasPermission(conn.authData.user, data.action)) {
+        // Access user data via conn.metadata
+        if (hasPermission(conn.metadata.user, data.action)) {
           processMessage(data)
         } else {
           conn.send({ type: 'error', message: 'Permission denied' })

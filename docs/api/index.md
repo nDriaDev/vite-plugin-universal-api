@@ -9,17 +9,17 @@ Complete reference for all configuration options available in vite-plugin-univer
 - **Type**: `boolean`
 - **Default**: `false`
 
-Disable the entire plugin.
+Disable the entire plugin. Useful for production builds or conditional enabling.
 
 ```typescript
 universalApi({
-  disable: true // Plugin won't run
+  disable: process.env.NODE_ENV === 'production'
 })
 ```
 
 ### logLevel
 
-- **Type**: `'debug' | 'info' | 'warn' | 'error'`
+- **Type**: `'debug' | 'info' | 'warn' | 'error' | 'silent'`
 - **Default**: `'info'`
 
 Logging verbosity level.
@@ -35,13 +35,14 @@ universalApi({
 - `info`: Informational messages about plugin operations
 - `warn`: Warnings about potential issues
 - `error`: Only error messages
+- `silent`: No output
 
 ### endpointPrefix
 
 - **Type**: `string | string[]`
-- **Required**: Yes
+- **Default**: `'/api'`
 
-URL prefix(es) for API endpoints.
+URL prefix(es) for API endpoints. Requests not starting with one of these prefixes are passed through untouched.
 
 ```typescript
 // Single prefix
@@ -79,6 +80,31 @@ universalApi({
 
 ::: tip
 If the directory doesn't exist, file-based routing will be disabled automatically, but the plugin will still work for custom handlers.
+:::
+
+### enablePreview
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+Control whether the plugin is active during `vite preview` (i.e. when locally serving the production build).
+
+By default the plugin intercepts requests in both `vite dev` and `vite preview`. Set this to `false` to restrict it to development only, so that preview mode behaves like a real production server — without mock interference.
+
+```typescript
+// Disable mocks in preview so the real API is hit
+universalApi({
+  enablePreview: false
+})
+
+// Keep mocks active in preview (default behaviour)
+universalApi({
+  enablePreview: true
+})
+```
+
+::: tip When to disable preview
+Use `enablePreview: false` when you want to verify your application against real API endpoints before deploying, or when your CI/staging pipeline runs `vite preview` and you do not want mock data to be returned.
 :::
 
 ### enableWs
@@ -131,13 +157,13 @@ universalApi({
 ### gatewayTimeout
 
 - **Type**: `number` (milliseconds)
-- **Default**: `30000` (30 seconds)
+- **Default**: `0` (disabled)
 
-Timeout for long-running handlers. Returns 504 Gateway Timeout if exceeded.
+Timeout for long-running handlers. Returns 504 Gateway Timeout if exceeded. Note this does NOT stop handler execution — it only changes the response status.
 
 ```typescript
 universalApi({
-  gatewayTimeout: 60000 // 1 minute timeout
+  gatewayTimeout: 5000 // Return 504 after 5 seconds
 })
 ```
 
@@ -146,7 +172,7 @@ universalApi({
 - **Type**: `'404' | 'forward'`
 - **Default**: `'404'`
 
-Behavior for requests that don't match any handler pattern.
+Behavior for requests that match the endpoint prefix but don't match any handler pattern.
 
 ```typescript
 // Return 404 for unmatched requests
@@ -177,7 +203,7 @@ Request body parsing configuration.
 
 ```typescript
 universalApi({
-  parser: true // Enables built-in JSON + form data parser
+  parser: true // Enables built-in JSON + form data + multipart parser
 })
 ```
 
@@ -218,7 +244,7 @@ The parser is executed **only** for REST API requests, not for WebSocket message
 
 ### handlerMiddlewares
 
-- **Type**: `MiddlewareFunction[]`
+- **Type**: `UniversalApiMiddleware[]`
 - **Default**: `[]`
 
 Global middleware executed before all handlers. Similar to Express middleware.
@@ -239,7 +265,6 @@ universalApi({
         res.end('Unauthorized')
         return
       }
-      req.body.user = await verifyToken(token)
       next()
     }
   ]
@@ -252,7 +277,7 @@ Middleware is executed **only** for handlers defined in the `handlers` array, **
 
 ### errorMiddlewares
 
-- **Type**: `ErrorHandlerFunction[]`
+- **Type**: `UniversalApiErrorMiddleware[]`
 - **Default**: `[]`
 
 Error handling middleware. Called when an error occurs during request processing.
@@ -283,7 +308,7 @@ universalApi({
 
 ### handlers
 
-- **Type**: `RestHandler[]`
+- **Type**: `UniversalApiRestFsHandler[]`
 - **Default**: `[]`
 
 REST API handler configurations. See [REST Handlers](/api/rest-handlers) for detailed documentation.
@@ -306,7 +331,7 @@ universalApi({
 
 ### wsHandlers
 
-- **Type**: `WebSocketHandler[]`
+- **Type**: `UniversalApiWsHandler[]`
 - **Required when** `enableWs: true`
 
 WebSocket handler configurations. See [WebSocket Handlers](/api/websocket-handlers) for detailed documentation.
@@ -329,10 +354,10 @@ universalApi({
 
 ### pagination
 
-- **Type**: `Partial<Record<HttpMethod, PaginationConfig>>`
+- **Type**: `Partial<Record<'ALL' | 'HEAD' | 'GET' | 'POST' | 'DELETE', PaginationConfig>> | null`
 - **Default**: `null`
 
-Global pagination configuration for file-based endpoints. Can be configured per HTTP method or for all methods.
+Global pagination configuration for file-based endpoints. Can be configured per HTTP method or for all methods using `ALL`.
 
 ```typescript
 universalApi({
@@ -356,22 +381,6 @@ universalApi({
 })
 ```
 
-**Usage:**
-
-```bash
-# GET request
-GET /api/users?limit=10&skip=20&sortBy=name&order=desc
-
-# POST request
-POST /api/users
-{
-  "pagination": {
-    "pageSize": 10,
-    "offset": 20
-  }
-}
-```
-
 ::: warning Requirements
 Pagination works **only** with:
 - ✅ File-based endpoints returning JSON arrays
@@ -383,7 +392,7 @@ Pagination works **only** with:
 
 ### filters
 
-- **Type**: `Partial<Record<HttpMethod, FilterConfig>>`
+- **Type**: `Partial<Record<'ALL' | 'HEAD' | 'GET' | 'POST' | 'DELETE', FilterConfig>> | null`
 - **Default**: `null`
 
 Global filter configuration for file-based endpoints.
@@ -400,8 +409,7 @@ universalApi({
           comparison: 'eq'
         },
         {
-          key: 'minAge',
-          field: 'age',
+          key: 'age',
           valueType: 'number',
           comparison: 'gte'
         }
@@ -411,23 +419,16 @@ universalApi({
 })
 ```
 
-**Usage:**
-
-```bash
-GET /api/users?status=active&minAge=18
-# Returns users where status === 'active' AND age >= 18
-```
-
 **Comparison operators:**
 - `eq`: equals (==)
-- `neq`: not equals (!=)
+- `ne`: not equals (!=)
 - `gt`: greater than (>)
 - `gte`: greater than or equal (>=)
 - `lt`: less than (<)
 - `lte`: less than or equal (<=)
 - `in`: value in array
 - `nin`: value not in array
-- `contains`: string contains (case-insensitive)
+- `regex`: regular expression match (use `regexFlags` for flags, e.g. `"i"` for case-insensitive)
 
 ::: warning Requirements
 Filters work **only** with:
@@ -452,9 +453,12 @@ export default defineConfig({
       endpointPrefix: '/api',
       fsDir: 'mock',
 
+      // Preview behaviour
+      enablePreview: false, // Disable mocks when running vite preview
+
       // Performance
       delay: 500,
-      gatewayTimeout: 30000,
+      gatewayTimeout: 5000,
 
       // Behavior
       noHandledRestFsRequestsAction: '404',
@@ -485,7 +489,7 @@ export default defineConfig({
           method: 'GET',
           handle: async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify({ id: req.params.id }))
+            res.end(JSON.stringify({ id: req.params?.id }))
           }
         }
       ],

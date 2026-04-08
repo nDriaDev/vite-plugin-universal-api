@@ -110,7 +110,7 @@ The response includes pagination metadata in headers:
 ```
 HTTP/1.1 200 OK
 Content-Type: application/json
-X-Total-Elements: 150
+X-Total-Count: 150
 Content-Length: 1234
 
 [
@@ -121,7 +121,7 @@ Content-Length: 1234
 ```
 
 **Headers:**
-- `X-Total-Elements`: Total count before pagination
+- `X-Total-Count`: Total count before pagination
 - `Content-Length`: Response body size
 
 ### Examples
@@ -171,13 +171,11 @@ filters: {
     filters: [
       {
         key: 'status',          // Query param name
-        field: 'status',        // Field in data (optional, defaults to key)
         valueType: 'string',    // Data type
         comparison: 'eq'        // Comparison operator
       },
       {
         key: 'minAge',
-        field: 'age',
         valueType: 'number',
         comparison: 'gte'
       }
@@ -222,14 +220,14 @@ filters: {
 | Operator | Description | Example |
 |----------|-------------|---------|
 | `eq` | Equals | `status=active` → status == 'active' |
-| `neq` | Not equals | `status=inactive` → status != 'inactive' |
+| `ne` | Not equals | `status=inactive` → status != 'inactive' |
 | `gt` | Greater than | `age=18` → age > 18 |
 | `gte` | Greater than or equal | `age=18` → age >= 18 |
 | `lt` | Less than | `age=65` → age < 65 |
 | `lte` | Less than or equal | `age=65` → age <= 65 |
 | `in` | Value in array | `id=1,2,3` → id in [1,2,3] |
 | `nin` | Value not in array | `id=4,5` → id not in [4,5] |
-| `contains` | String contains (case-insensitive) | `name=john` → name includes 'john' |
+| `regex` | Regular expression match | `name=^John` → name matches /^John/ (use `regexFlags` for flags) |
 
 ### Value Types
 
@@ -239,6 +237,11 @@ Specify data type for proper comparison:
 valueType: 'string'   // String comparison
 valueType: 'number'   // Numeric comparison
 valueType: 'boolean'  // Boolean comparison
+valueType: 'date'   // Date comparison
+valueType: 'string[]'   // String array comparison
+valueType: 'number[]'   // Numeric array comparison
+valueType: 'boolean[]'  // Boolean array comparison
+valueType: 'date[]'   // Date array comparison
 ```
 
 ### Filter Examples
@@ -266,13 +269,11 @@ GET /api/users?status=active
 filters: [
   {
     key: 'minAge',
-    field: 'age',
     valueType: 'number',
     comparison: 'gte'
   },
   {
     key: 'maxAge',
-    field: 'age',
     valueType: 'number',
     comparison: 'lte'
   }
@@ -290,7 +291,6 @@ GET /api/users?minAge=18&maxAge=65
 filters: [
   {
     key: 'ids',
-    field: 'id',
     valueType: 'number',
     comparison: 'in'
   }
@@ -300,24 +300,6 @@ filters: [
 ```bash
 GET /api/users?ids=1,2,3,5,8
 # Returns users where id in [1,2,3,5,8]
-```
-
-#### Contains Filter
-
-```typescript
-filters: [
-  {
-    key: 'search',
-    field: 'name',
-    valueType: 'string',
-    comparison: 'contains'
-  }
-]
-```
-
-```bash
-GET /api/users?search=john
-# Returns users where name contains 'john' (case-insensitive)
 ```
 
 ## Combining Pagination & Filters
@@ -339,7 +321,7 @@ universalApi({
       type: 'query-param',
       filters: [
         { key: 'status', valueType: 'string', comparison: 'eq' },
-        { key: 'minAge', field: 'age', valueType: 'number', comparison: 'gte' }
+        { key: 'minAge', valueType: 'number', comparison: 'gte' }
       ]
     }
   }
@@ -355,7 +337,7 @@ GET /api/users?status=active&minAge=18&limit=10&skip=0&sortBy=name&order=asc
 1. Apply filters → Get matching items
 2. Sort results
 3. Apply pagination → Return subset
-4. Return data with `X-Total-Elements` header
+4. Return data with `X-Total-Count` header
 
 ## Per-Handler Configuration
 
@@ -449,7 +431,7 @@ filters: {
   GET: {
     type: 'query-param',
     filters: [
-      { key: 'q', field: 'name', valueType: 'string', comparison: 'contains' }
+      { key: 'q', valueType: 'string', comparison: 'eq' }
     ]
   }
 },
@@ -494,8 +476,8 @@ filters: {
   GET: {
     type: 'query-param',
     filters: [
-      { key: 'minPrice', field: 'price', valueType: 'number', comparison: 'gte' },
-      { key: 'maxPrice', field: 'price', valueType: 'number', comparison: 'lte' }
+      { key: 'minPrice', valueType: 'number', comparison: 'gte' },
+      { key: 'maxPrice', valueType: 'number', comparison: 'lte' }
     ]
   }
 }
