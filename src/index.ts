@@ -1,4 +1,4 @@
-import { Connect, Plugin } from "vite";
+import { Connect, HttpServer, Plugin } from "vite";
 import { UniversalApiOptions, UniversalApiOptionsRequired } from "./models/index.model";
 import { Logger } from "./utils/Logger";
 import { Constants } from "./utils/constants";
@@ -8,7 +8,10 @@ import { runPlugin, runWsPlugin } from "./utils/plugin";
 
 function plugin(opts?: UniversalApiOptions): Plugin {
 	let options: UniversalApiOptionsRequired,
-		logger: Logger;
+		logger: Logger,
+		currentHandler: ((req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => Promise<void>) | null = null,
+		registeredOnServer: HttpServer | null = null;
+
 	return {
 		name: Constants.PLUGIN_NAME,
 		apply: "serve",
@@ -31,24 +34,45 @@ function plugin(opts?: UniversalApiOptions): Plugin {
 		},
 		configureServer(server) {
 			if (options.disable) {
+				currentHandler = null;
 				return;
 			}
 			logger.debug("Vite configureServer: START", `options= ${JSON.stringify({ ...options, config: "", matcher: "" }, null, 2)}`);
-			server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => {
+			currentHandler = async (req, res, next) => {
 				await runPlugin(req, res, next, logger, options);
-			})
-			runWsPlugin(server, logger, options);
+			};
+			if (server.httpServer && server.httpServer !== registeredOnServer) {
+				registeredOnServer = server.httpServer;
+				server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => {
+					await currentHandler!(req, res, next);
+				});
+				const cleanup = runWsPlugin(server, logger, options);
+				server.httpServer?.once("close", () => cleanup?.());
+			}
 			logger.debug("Vite configureServer: FINISH");
 		},
 		configurePreviewServer(server) {
 			if (options.disable) {
+				currentHandler = null;
+				return;
+			}
+			if (!options.enablePreview) {
+				logger.debug("Vite configurePreviewServer: disabled in preview mode");
+				currentHandler = null;
 				return;
 			}
 			logger.debug("Vite configurePreviewServer: START", `options= ${JSON.stringify({ ...options, config: "", matcher: "" }, null, 2)}`);
-			server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => {
+			currentHandler = async (req, res, next) => {
 				await runPlugin(req, res, next, logger, options);
-			})
-			runWsPlugin(server, logger, options);
+			};
+			if (server.httpServer && server.httpServer !== registeredOnServer) {
+				registeredOnServer = server.httpServer;
+				server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => {
+					await currentHandler!(req, res, next);
+				});
+				const cleanup = runWsPlugin(server, logger, options);
+				server.httpServer?.once("close", () => cleanup?.());
+			}
 			logger.debug("Vite configurePreviewServer: FINISH");
 		}
 	}
