@@ -7,10 +7,10 @@ import { MimeType } from "./MimeType";
 import { Constants } from "./constants";
 import { AntPathMatcher } from "./AntPathMatcher";
 import { UniversalApiError } from "./Error";
-import { Socket } from "node:net";
-import { ConnectionManager, WebSocketConnection, WebSocketFrameParser } from "./WebSocket";
+import { ConnectionManager, WebSocketConnection, WebSocketServer } from "./WebSocket";
 import { ILogger } from "../models/logger.model";
-import { IWebSocketConnection, WebSocketFrame } from "../models/webSocket.model";
+import { Socket } from "node:net";
+
 
 /* v8 ignore start */
 /**
@@ -18,7 +18,7 @@ import { IWebSocketConnection, WebSocketFrame } from "../models/webSocket.model"
  * Not used for now. It simulates the options http request behavior
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-function handlingOptionsRequest(logger: ILogger, matcher: AntPathMatcher, fullUrl: URL, request: UniversalApiRequest, handlers: UniversalApiRestFsHandler[], endpointNoPrefix: string, result: HandledRequestData): boolean {
+function handlingOptionsRequest(logger: ILogger, matcher: AntPathMatcher, fullUrl: URL, request: UniversalApiRequest<any>, handlers: UniversalApiRestFsHandler[], endpointNoPrefix: string, result: HandledRequestData): boolean {
 	logger.debug("handlingOptionsRequest: START");
 	try {
 		if (request.method !== "OPTIONS") {
@@ -36,7 +36,7 @@ function handlingOptionsRequest(logger: ILogger, matcher: AntPathMatcher, fullUr
 				if (request.method === handle.method) {
 					return false;
 				} else {
-					allow.add(request.method!);
+					allow.add(handle.method!);
 				}
 			}
 		}
@@ -63,7 +63,7 @@ function handlingOptionsRequest(logger: ILogger, matcher: AntPathMatcher, fullUr
 }
 /* v8 ignore stop */
 
-async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: UniversalApiRequest, res: ServerResponse, paginationPlugin: UniversalApiOptionsRequired["pagination"], filtersPlugin: UniversalApiOptionsRequired["filters"], parser: UniversalApiOptionsRequired["parser"], handler: UniversalApiRestFsHandler | null, endpointPrefix: string[], fullFsDir: string | null, result: HandledRequestData): Promise<boolean> {
+async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: UniversalApiRequest<any>, res: ServerResponse, paginationPlugin: UniversalApiOptionsRequired["pagination"], filtersPlugin: UniversalApiOptionsRequired["filters"], parser: UniversalApiOptionsRequired["parser"], handler: UniversalApiRestFsHandler | null, endpointPrefix: string[], fullFsDir: string | null, result: HandledRequestData): Promise<boolean> {
 	logger.debug("handlingApiFsRequest: START");
 	try {
 		const IS_API_REST_FS = handler !== null && handler.handle === "FS",
@@ -453,7 +453,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 	}
 }
 
-async function handlingApiRestRequest(logger: ILogger, matcher: AntPathMatcher, fullUrl: URL, request: UniversalApiRequest, res: ServerResponse, handlers: UniversalApiOptionsRequired["handlers"], middlewares: UniversalApiOptionsRequired["middlewares"], errorMiddlewares: UniversalApiOptionsRequired["errorMiddlewares"], delay: UniversalApiOptionsRequired["delay"], pagination: UniversalApiOptionsRequired["pagination"], filters: UniversalApiOptionsRequired["filters"], parser: UniversalApiOptionsRequired["parser"], endpointPrefix: string[], endpointNoPrefix: string, fullFsDir: string | null, result: HandledRequestData): Promise<boolean> {
+async function handlingApiRestRequest(logger: ILogger, matcher: AntPathMatcher, fullUrl: URL, request: UniversalApiRequest<any>, res: ServerResponse, handlers: UniversalApiOptionsRequired["handlers"], middlewares: UniversalApiOptionsRequired["middlewares"], errorMiddlewares: UniversalApiOptionsRequired["errorMiddlewares"], delay: UniversalApiOptionsRequired["delay"], pagination: UniversalApiOptionsRequired["pagination"], filters: UniversalApiOptionsRequired["filters"], parser: UniversalApiOptionsRequired["parser"], endpointPrefix: string[], endpointNoPrefix: string, fullFsDir: string | null, result: HandledRequestData): Promise<boolean> {
 	logger.debug("handlingApiRestRequest: START");
 	try {
 		let handler: typeof handlers[number] | null = null;
@@ -524,7 +524,7 @@ const runPluginInternal = async (req: IncomingMessage, res: ServerResponse, logg
 	const { config, endpointPrefix, handlers, matcher, middlewares, errorMiddlewares, delay, fullFsDir, filters, pagination, parser } = options;
 	const fullUrl = Utils.request.buildFullUrl(req, config);
 	const endpointNoPrefix = Utils.request.removeEndpointPrefix(fullUrl.pathname, endpointPrefix);
-	let requ: UniversalApiRequest = req as UniversalApiRequest;
+	let requ: UniversalApiRequest<any> = req as UniversalApiRequest<any>;
 	try {
 		logger.debug(`runPluginInternal: START request url = ${req.url}`);
 
@@ -541,7 +541,7 @@ const runPluginInternal = async (req: IncomingMessage, res: ServerResponse, logg
 		const request = Utils.request.createRequest(req);
 		requ = request;
 
-		logger.debug(`runPluginInternal: fullUrl=${endpointNoPrefix}, endpointNoPrefix=${endpointNoPrefix}`);
+		logger.debug(`runPluginInternal: fullUrl=${fullUrl.pathname}, endpointNoPrefix=${endpointNoPrefix}`);
 
 		let handled = await handlingApiRestRequest(logger, matcher, fullUrl, request, res, handlers, middlewares, errorMiddlewares, delay, pagination, filters, parser, endpointPrefix, endpointNoPrefix, fullFsDir, result);
 		if (handled) {

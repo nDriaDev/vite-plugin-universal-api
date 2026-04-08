@@ -25,20 +25,23 @@ import { AntPathMatcher } from "../utils/AntPathMatcher";
  * console.log(req.query.get('q')); // "test"
  * console.log(req.query.get('limit')); // "10"
  */
-export interface UniversalApiRequest extends IncomingMessage {
-    /**
+export interface UniversalApiRequest<TBody = unknown> extends IncomingMessage {
+	/**
 	 * Parsed request body.
-	 * Type depends on the content and parser used.
+	 * The type is determined by the generic parameter `TBody` (defaults to `unknown`).
+	 * Specify the type explicitly to get full type safety: `UniversalApiRequest<MyDto>`.
 	 *
 	 * @example
-	 * // JSON body
-	 * req.body = { username: 'john', age: 30 };
+	 * // Typed body: compiler enforces correctness
+	 * const req: UniversalApiRequest<{ username: string; age: number }>;
+	 * req.body.username; // string ✓
 	 *
 	 * @example
-	 * // Form data
-	 * req.body = { field1: 'value1', field2: 'value2' };
+	 * // Untyped: body must be narrowed before use
+	 * const req: UniversalApiRequest; // TBody = unknown
+	 * if (typeof req.body === 'object' && req.body !== null) { ... }
 	 */
-	body: any;
+	body: TBody;
 
 	/**
 	 * Route parameters extracted from the URL pattern.
@@ -49,7 +52,7 @@ export interface UniversalApiRequest extends IncomingMessage {
 	 * // Request: "/api/users/123/posts/456"
 	 * req.params = { userId: '123', postId: '456' };
 	 */
-    params: Record<string, string> | null;
+	params: Record<string, string> | null;
 
 	/**
 	 * Parsed URL query parameters.
@@ -102,7 +105,7 @@ export interface UniversalApiRequest extends IncomingMessage {
  *   res.end(JSON.stringify(user));
  * };
  */
-export type UniversalApiSimpleHandler = (req: UniversalApiRequest, res: ServerResponse) => void | Promise<void>;
+export type UniversalApiSimpleHandler<TBody = unknown> = (req: UniversalApiRequest<TBody>, res: ServerResponse) => void | Promise<void>;
 
 /**
  * Middleware function for pre-processing requests.
@@ -127,7 +130,7 @@ export type UniversalApiSimpleHandler = (req: UniversalApiRequest, res: ServerRe
  *   next();
  * };
  */
-export type UniversalApiMiddleware = (req: UniversalApiRequest, res: ServerResponse, next: Connect.NextFunction) => void | Promise<void>;
+export type UniversalApiMiddleware<TBody = unknown> = (req: UniversalApiRequest<TBody>, res: ServerResponse, next: Connect.NextFunction) => void | Promise<void>;
 
 /**
  * Error handling middleware function.
@@ -230,7 +233,7 @@ export type UniversalApiParser = boolean | {
  * Common pagination options.
  */
 type UniversalApiPaginationCommon = {
-    /**
+	/**
 	 * Query parameter or body field name for the limit value.
 	 * Specifies maximum number of results to return.
 	 *
@@ -256,7 +259,7 @@ type UniversalApiPaginationCommon = {
 	 * // Body field: { pagination: { offset: 20 } }
 	 * skip: "pagination.offset"
 	 */
-    skip?: string;
+	skip?: string;
 
 	/**
 	 * Query parameter or body field name for the sort field.
@@ -270,7 +273,7 @@ type UniversalApiPaginationCommon = {
 	 * // Body field: { sortBy: "name" }
 	 * sort: "sortBy"
 	 */
-    sort?: string;
+	sort?: string;
 
 	/**
 	 * Query parameter or body field name for the sort order.
@@ -284,7 +287,7 @@ type UniversalApiPaginationCommon = {
 	 * // Body field: { sortOrder: "ASC" }
 	 * order: "sortOrder"
 	 */
-    order?: string;
+	order?: string;
 }
 
 /**
@@ -313,10 +316,10 @@ type UniversalApiPaginationCommon = {
  * // Request body: { pagination: { pageSize: 10, offset: 20 } }
  */
 type UniversalApiPagination = (
-    | {
-        /** Pagination options provided in request body */
-        type: "body";
-        /**
+	| {
+		/** Pagination options provided in request body */
+		type: "body";
+		/**
 		 * Root object path in body containing pagination options.
 		 * If omitted, looks for pagination fields at the body root level.
 		 *
@@ -331,19 +334,19 @@ type UniversalApiPagination = (
 		 * root: undefined
 		 */
 		root?: string;
-    }
-    | {
-        /** Pagination options provided as URL query parameters */
-        type: "query-param";
-        root?: never;
-    }
+	}
+	| {
+		/** Pagination options provided as URL query parameters */
+		type: "query-param";
+		root?: never;
+	}
 ) & UniversalApiPaginationCommon;
 
 /**
  * Common filter options.
  */
 type UniversalApiFilterCommon = {
-    /**
+	/**
 	 * Query parameter or body field name containing the value to filter by.
 	 *
 	 * @example
@@ -372,7 +375,7 @@ type UniversalApiFilterCommon = {
 	 * // Custom parser
 	 * valueType: (val) => val.toLowerCase().trim()
 	 */
-    valueType: "string" | "boolean" | "number" | "date" | "string[]" | "boolean[]" | "number[]" | "date[]" | ((val: any) => any);
+	valueType: "string" | "boolean" | "number" | "date" | "string[]" | "boolean[]" | "number[]" | "date[]" | ((val: any) => any);
 
 	/**
 	 * Comparison operator for filtering.
@@ -411,7 +414,7 @@ type UniversalApiFilterCommon = {
 	 *   regexFlags: "i" // Case-insensitive matching
 	 * }
 	 */
-    regexFlags?: string;
+	regexFlags?: string;
 }
 
 /**
@@ -441,10 +444,10 @@ type UniversalApiFilterCommon = {
  * // Request body: { filters: { email: "@gmail.com" } }
  */
 type UniversalApiFilter = (
-    | {
-        /** Filter options provided in request body */
-        type: "body";
-        /**
+	| {
+		/** Filter options provided in request body */
+		type: "body";
+		/**
 		 * Root object path in body containing filter options.
 		 *
 		 * @example
@@ -455,56 +458,56 @@ type UniversalApiFilter = (
 		root?: string;
 		/** Array of filter definitions */
 		filters: UniversalApiFilterCommon[];
-    }
-    | {
-        /** Filter options provided as URL query parameters */
-        type: "query-param";
-        root?: never;
+	}
+	| {
+		/** Filter options provided as URL query parameters */
+		type: "query-param";
+		root?: never;
 		/** Array of filter definitions */
 		filters: UniversalApiFilterCommon[];
-    }
+	}
 );
 
 /**
  * Common options shared by all handler types.
  */
 type UniversalApiHandlerCommon = {
-    /**
-     * Apache Ant-style path pattern for URL matching.
-     *
-     * Pattern syntax:
-     * - `?` matches exactly one character
-     * - `*` matches zero or more characters (within a path segment)
-     * - `**` matches zero or more path segments
-     * - `{name}` captures a path variable
-     * - `{name:regex}` captures a path variable matching the regex
-     *
-     * @example
-     * // Exact path
-     * pattern: "/api/users"
-     *
-     * @example
-     * // Path with variable
-     * pattern: "/api/users/{id}"
-     * // Matches: /api/users/123, /api/users/abc
-     *
-     * @example
-     * // Wildcard in segment
-     * pattern: "/api/files/*.json"
-     * // Matches: /api/files/data.json, /api/files/config.json
-     *
-     * @example
-     * // Multiple segments
-     * pattern: "/api/**\/details"
-     * // Matches: /api/users/123/details, /api/products/details
-     *
-     * @example
-     * // Regex validation
-     * pattern: "/api/users/{id:[0-9]+}"
-     * // Matches: /api/users/123
-     * // Does NOT match: /api/users/abc
-     */
-    pattern: string;
+	/**
+	 * Apache Ant-style path pattern for URL matching.
+	 *
+	 * Pattern syntax:
+	 * - `?` matches exactly one character
+	 * - `*` matches zero or more characters (within a path segment)
+	 * - `**` matches zero or more path segments
+	 * - `{name}` captures a path variable
+	 * - `{name:regex}` captures a path variable matching the regex
+	 *
+	 * @example
+	 * // Exact path
+	 * pattern: "/api/users"
+	 *
+	 * @example
+	 * // Path with variable
+	 * pattern: "/api/users/{id}"
+	 * // Matches: /api/users/123, /api/users/abc
+	 *
+	 * @example
+	 * // Wildcard in segment
+	 * pattern: "/api/files/*.json"
+	 * // Matches: /api/files/data.json, /api/files/config.json
+	 *
+	 * @example
+	 * // Multiple segments
+	 * pattern: "/api/**\/details"
+	 * // Matches: /api/users/123/details, /api/products/details
+	 *
+	 * @example
+	 * // Regex validation
+	 * pattern: "/api/users/{id:[0-9]+}"
+	 * // Matches: /api/users/123
+	 * // Does NOT match: /api/users/abc
+	 */
+	pattern: string;
 
 	/**
 	 * Disable this handler without removing it from configuration.
@@ -519,7 +522,7 @@ type UniversalApiHandlerCommon = {
 	 *   handle: myHandler
 	 * }
 	 */
-    disabled?: boolean;
+	disabled?: boolean;
 
 	/**
 	 * Artificial delay in milliseconds before sending response.
@@ -600,117 +603,117 @@ type UniversalApiHandlerCommon = {
  * }
  */
 export type UniversalApiRestFsHandler = (
-    | {
-        /**
-         * HTTP method(s) handled by this configuration.
-         *
-         * Supported methods:
-         * - `HEAD`: Request headers only
-         * - `GET`: Retrieve data
-         * - `POST`: Create or submit data
-         * - `PUT`: Update/replace data
-         * - `PATCH`: Partially update data
-         * - `DELETE`: Remove data
-         * - `OPTIONS`: CORS preflight
-         */
-        method: "HEAD" | "GET" | "POST";
+	| {
+		/**
+		 * HTTP method(s) handled by this configuration.
+		 *
+		 * Supported methods:
+		 * - `HEAD`: Request headers only
+		 * - `GET`: Retrieve data
+		 * - `POST`: Create or submit data
+		 * - `PUT`: Update/replace data
+		 * - `PATCH`: Partially update data
+		 * - `DELETE`: Remove data
+		 * - `OPTIONS`: CORS preflight
+		 */
+		method: "HEAD" | "GET" | "POST";
 
 		/**
-         * File system handler.
-         * Serves files from the directory specified in `fsDir` plugin option.
-         *
-         * Supports:
-         * - JSON files with automatic pagination and filtering (if configured)
-         * - Static files (images, documents, etc.)
-         * - Directory listings (if enabled)
-         *
-         * @example
-         * // Serve user data from file system
-         * {
-         *   pattern: "/api/users",
-         *   method: "GET",
-         *   handle: "FS"
-         * }
-         * // Reads from: {fsDir}/api/users.json or {fsDir}/api/users/
-         */
-        handle: "FS";
+		 * File system handler.
+		 * Serves files from the directory specified in `fsDir` plugin option.
+		 *
+		 * Supports:
+		 * - JSON files with automatic pagination and filtering (if configured)
+		 * - Static files (images, documents, etc.)
+		 * - Directory listings (if enabled)
+		 *
+		 * @example
+		 * // Serve user data from file system
+		 * {
+		 *   pattern: "/api/users",
+		 *   method: "GET",
+		 *   handle: "FS"
+		 * }
+		 * // Reads from: {fsDir}/api/users.json or {fsDir}/api/users/
+		 */
+		handle: "FS";
 
 		/**
-         * Pre-processing configuration for URL transformation.
-         * Applied before the file system lookup.
-         *
-         * @example
-         * // Replace API version in URL
-         * preHandle: {
-         *   transform: (url) => url.replace('/v2/', '/v1/')
-         * }
-         *
-         * @example
-         * // Multiple replacements
-         * preHandle: {
-         *   transform: [
-         *     { searchValue: '/api/', replaceValue: '/data/' },
-         *     { searchValue: '.json', replaceValue: '' }
-         *   ]
-         * }
-         */
-        preHandle?: {
-            transform: ((originalEndpoint: string) => string) | { searchValue: string, replaceValue: string }[];
-        };
+		 * Pre-processing configuration for URL transformation.
+		 * Applied before the file system lookup.
+		 *
+		 * @example
+		 * // Replace API version in URL
+		 * preHandle: {
+		 *   transform: (url) => url.replace('/v2/', '/v1/')
+		 * }
+		 *
+		 * @example
+		 * // Multiple replacements
+		 * preHandle: {
+		 *   transform: [
+		 *     { searchValue: '/api/', replaceValue: '/data/' },
+		 *     { searchValue: '.json', replaceValue: '' }
+		 *   ]
+		 * }
+		 */
+		preHandle?: {
+			transform: ((originalEndpoint: string) => string) | { searchValue: string, replaceValue: string }[];
+		};
 
 		/**
-         * Must be undefined for file system handlers that support pagination/filtering.
-         * Use the alternative signature if post-processing is needed.
-         */
-        postHandle?: never;
+		 * Must be undefined for file system handlers that support pagination/filtering.
+		 * Use the alternative signature if post-processing is needed.
+		 */
+		postHandle?: never;
 
 		/**
-         * Pagination configuration for this handler.
-         * Only works with JSON files containing arrays.
-         *
-         * Options:
-         * - `"none"`: Explicitly disable pagination for this handler
-         * - `{ inclusive }`: Merge with global pagination config
-         * - `{ exclusive }`: Use only this config, ignore global
-         *
-         * @example
-         * // Use handler-specific pagination only
-         * pagination: {
-         *   exclusive: {
-         *     type: "query-param",
-         *     limit: "pageSize",
-         *     skip: "offset"
-         *   }
-         * }
-         *
-         * @example
-         * // Disable pagination for this endpoint
-         * pagination: "none"
-         */
-        pagination?: "none" | {inclusive?: UniversalApiPagination, exclusive?: never} | {inclusive?: never, exclusive?: UniversalApiPagination};
+		 * Pagination configuration for this handler.
+		 * Only works with JSON files containing arrays.
+		 *
+		 * Options:
+		 * - `"none"`: Explicitly disable pagination for this handler
+		 * - `{ inclusive }`: Merge with global pagination config
+		 * - `{ exclusive }`: Use only this config, ignore global
+		 *
+		 * @example
+		 * // Use handler-specific pagination only
+		 * pagination: {
+		 *   exclusive: {
+		 *     type: "query-param",
+		 *     limit: "pageSize",
+		 *     skip: "offset"
+		 *   }
+		 * }
+		 *
+		 * @example
+		 * // Disable pagination for this endpoint
+		 * pagination: "none"
+		 */
+		pagination?: "none" | { inclusive?: UniversalApiPagination, exclusive?: never } | { inclusive?: never, exclusive?: UniversalApiPagination };
 
 		/**
-         * Filter configuration for this handler.
-         * Only works with JSON files containing arrays.
-         *
-         * Options:
-         * - `"none"`: Explicitly disable filters for this handler
-         * - `{ inclusive }`: Merge with global filter config
-         * - `{ exclusive }`: Use only this config, ignore global
-         *
-         * @example
-         * // Handler-specific filters
-         * filters: {
-         *   exclusive: {
-         *     type: "query-param",
-         *     filters: [
-         *       { key: "status", valueType: "string", comparison: "eq" },
-         *       { key: "price", valueType: "number", comparison: "lte" }
-         *     ]
-         *   }
-         * }
-         */
-		filters?: "none" | {inclusive?: UniversalApiFilter, exclusive?: never} | {inclusive?: never, exclusive?: UniversalApiFilter};
+		 * Filter configuration for this handler.
+		 * Only works with JSON files containing arrays.
+		 *
+		 * Options:
+		 * - `"none"`: Explicitly disable filters for this handler
+		 * - `{ inclusive }`: Merge with global filter config
+		 * - `{ exclusive }`: Use only this config, ignore global
+		 *
+		 * @example
+		 * // Handler-specific filters
+		 * filters: {
+		 *   exclusive: {
+		 *     type: "query-param",
+		 *     filters: [
+		 *       { key: "status", valueType: "string", comparison: "eq" },
+		 *       { key: "price", valueType: "number", comparison: "lte" }
+		 *     ]
+		 *   }
+		 * }
+		 */
+		filters?: "none" | { inclusive?: UniversalApiFilter, exclusive?: never } | { inclusive?: never, exclusive?: UniversalApiFilter };
 	}
 	| {
 		method: "HEAD" | "GET" | "POST";
@@ -719,33 +722,46 @@ export type UniversalApiRestFsHandler = (
 			transform: ((originalEndpoint: string) => string) | { searchValue: string, replaceValue: string }[];
 		};
 		/**
-         * Post-processing function called after file is read.
-         * Can modify the response before sending to client.
-         *
-         * @param req - The processed request
-         * @param res - ServerResponse for sending modified response
-         * @param data - File content (null if file not found)
-         *
-         * @example
-         * // Add metadata to file response
-         * postHandle: async (req, res, data) => {
-         *   if (!data) {
-         *     res.writeHead(404);
-         *     res.end('Not found');
-         *     return;
-         *   }
-         *
-         *   const response = {
-         *     data: JSON.parse(data),
-         *     timestamp: Date.now(),
-         *     path: req.url
-         *   };
-         *
-         *   res.writeHead(200, { 'Content-Type': 'application/json' });
-         *   res.end(JSON.stringify(response));
-         * }
-         */
-		postHandle?: (req: UniversalApiRequest, res: ServerResponse, data: string | null) => void | Promise<void>;
+		 * Post-processing function called after file is read.
+		 * Can modify the response before sending to client.
+		 *
+		 * @param req - The processed request
+		 * @param res - ServerResponse for sending modified response
+		 * @param data - File content (null if file not found)
+		 *
+		 * @example
+		 * // Add metadata to file response
+		 * postHandle: async (req, res, data) => {
+		 *   if (!data) {
+		 *     res.writeHead(404);
+		 *     res.end('Not found');
+		 *     return;
+		 *   }
+		 *
+		 *   const response = {
+		 *     data: JSON.parse(data),
+		 *     timestamp: Date.now(),
+		 *     path: req.url
+		 *   };
+		 *
+		 *   res.writeHead(200, { 'Content-Type': 'application/json' });
+		 *   res.end(JSON.stringify(response));
+		 * }
+		 *
+		 * @example
+		 * // Custom DELETE handler
+		 * postHandle: async (req, res, data) => {
+		 *   if (data) {
+		 *     await logDeletion(req.params.id);
+		 *     res.writeHead(204);
+		 *     res.end();
+		 *   } else {
+		 *     res.writeHead(404);
+		 *     res.end('Resource not found');
+		 *   }
+		 * }
+		 */
+		postHandle?: <TBody = unknown>(req: UniversalApiRequest<TBody>, res: ServerResponse, data: string | null) => void | Promise<void>;
 		pagination?: never;
 		filters?: never;
 	}
@@ -756,51 +772,51 @@ export type UniversalApiRestFsHandler = (
 			transform: ((originalEndpoint: string) => string) | { searchValue: string, replaceValue: string }[];
 		};
 		/**
-         * Post-processing for PUT/PATCH/DELETE file operations.
-         *
-         * @example
-         * // Custom DELETE handler
-         * postHandle: async (req, res, data) => {
-         *   if (data) {
-         *     await logDeletion(req.params.id);
-         *     res.writeHead(204);
-         *     res.end();
-         *   } else {
-         *     res.writeHead(404);
-         *     res.end('Resource not found');
-         *   }
-         * }
-         */
-		postHandle?: (req: UniversalApiRequest, res: ServerResponse, data: string | null) => void | Promise<void>;
+		 * Post-processing for PUT/PATCH/DELETE file operations.
+		 *
+		 * @example
+		 * // Custom DELETE handler
+		 * postHandle: async (req, res, data) => {
+		 *   if (data) {
+		 *     await logDeletion(req.params.id);
+		 *     res.writeHead(204);
+		 *     res.end();
+		 *   } else {
+		 *     res.writeHead(404);
+		 *     res.end('Resource not found');
+		 *   }
+		 * }
+		 */
+		postHandle?: <TBody = unknown>(req: UniversalApiRequest<TBody>, res: ServerResponse, data: string | null) => void | Promise<void>;
 		pagination?: never;
 		filters?: never;
 	}
-    | {
+	| {
 		method: "HEAD" | "GET" | "POST" | "PUT" | "PATCH" | "OPTIONS" | "DELETE";
 		/**
-         * Custom handler function for full control over request processing.
-         *
-         * @example
-         * // Simple API endpoint
-         * handle: async (req, res) => {
-         *   const userId = req.params?.id;
-         *
-         *   try {
-         *     const user = await database.findUser(userId);
-         *     res.writeHead(200, { 'Content-Type': 'application/json' });
-         *     res.end(JSON.stringify(user));
-         *   } catch (error) {
-         *     res.writeHead(500, { 'Content-Type': 'application/json' });
-         *     res.end(JSON.stringify({ error: 'Database error' }));
-         *   }
-         * }
-         */
-        handle: UniversalApiSimpleHandler;
-        preHandle?: never;
-        postHandle?: never;
-        pagination?: never;
+		 * Custom handler function for full control over request processing.
+		 *
+		 * @example
+		 * // Simple API endpoint
+		 * handle: async (req, res) => {
+		 *   const userId = req.params?.id;
+		 *
+		 *   try {
+		 *     const user = await database.findUser(userId);
+		 *     res.writeHead(200, { 'Content-Type': 'application/json' });
+		 *     res.end(JSON.stringify(user));
+		 *   } catch (error) {
+		 *     res.writeHead(500, { 'Content-Type': 'application/json' });
+		 *     res.end(JSON.stringify({ error: 'Database error' }));
+		 *   }
+		 * }
+		 */
+		handle: UniversalApiSimpleHandler<any>;
+		preHandle?: never;
+		postHandle?: never;
+		pagination?: never;
 		filters?: never;
-    }
+	}
 ) & UniversalApiHandlerCommon;
 
 /**
@@ -844,22 +860,22 @@ export type UniversalApiRestFsHandler = (
  */
 export type UniversalApiWsHandler = {
 	/**
-     * Apache Ant-style path pattern for WebSocket URL matching.
-     * Same syntax as REST handlers.
-     *
-     * @example
-     * pattern: "/ws/chat"
-     *
-     * @example
-     * pattern: "/ws/game/{gameId}"
-     */
-    pattern: string;
+	 * Apache Ant-style path pattern for WebSocket URL matching.
+	 * Same syntax as REST handlers.
+	 *
+	 * @example
+	 * pattern: "/ws/chat"
+	 *
+	 * @example
+	 * pattern: "/ws/game/{gameId}"
+	 */
+	pattern: string;
 
 	/**
 	 * Disable this WebSocket handler.
 	 * @default false
 	 */
-    disabled?: boolean;
+	disabled?: boolean;
 
 	/**
 	 * Artificial delay before processing messages.
@@ -873,7 +889,7 @@ export type UniversalApiWsHandler = {
 	 *
 	 * - false: disable compression
 	 * - true: if client send extension, enable compression with his options.
-	 * - object: if client send etension, enable compression according client options and __strict__ plugin option.
+	 * - object: if client send extension, enable compression according client options and __strict__ plugin option.
 	 *
 	 * @default false
 	 */
@@ -922,408 +938,408 @@ export type UniversalApiWsHandler = {
 	inactivityTimeout?: number | false;
 
 	/**
-     * Optional function to transform raw message payload before passing to onMessage.
-     * Useful for custom encoding formats (Protobuf, MessagePack, etc.).
-     *
-     * If not provided, the plugin's default behavior is:
+	 * Optional function to transform raw message payload before passing to onMessage.
+	 * Useful for custom encoding formats (Protobuf, MessagePack, etc.).
+	 *
+	 * If not provided, the plugin's default behavior is:
 	 * - For text frames (0x01): Convert to UTF-8 string, attempt JSON.parse(), fallback to raw string
 	 * - For binary frames (0x02): Pass the Buffer as-is
-     *
-     * @param rawMessage - Raw Buffer received from WebSocket frame(s)
-     * @returns Transformed message (any type)
-     *
-     * @example
-     * // Decode MessagePack
-     * transformRawData: async (buffer) => {
-     *   return msgpack.decode(buffer);
-     * }
-     *
-     * @example
-     * // Decode Protobuf
-     * transformRawData: (buffer) => {
-     *   return MyProtoMessage.decode(buffer);
-     * }
-     *
-     * @example
-     * // Custom JSON with validation
-     * transformRawData: (buffer) => {
-     *   const text = buffer.toString('utf8');
-     *   const data = JSON.parse(text);
-     *   if (!data.type) throw new Error('Invalid message format');
-     *   return data;
-     * }
-     */
+	 *
+	 * @param rawMessage - Raw Buffer received from WebSocket frame(s)
+	 * @returns Transformed message (any type)
+	 *
+	 * @example
+	 * // Decode MessagePack
+	 * transformRawData: async (buffer) => {
+	 *   return msgpack.decode(buffer);
+	 * }
+	 *
+	 * @example
+	 * // Decode Protobuf
+	 * transformRawData: (buffer) => {
+	 *   return MyProtoMessage.decode(buffer);
+	 * }
+	 *
+	 * @example
+	 * // Custom JSON with validation
+	 * transformRawData: (buffer) => {
+	 *   const text = buffer.toString('utf8');
+	 *   const data = JSON.parse(text);
+	 *   if (!data.type) throw new Error('Invalid message format');
+	 *   return data;
+	 * }
+	 */
 	transformRawData?: (rawMessage: Buffer) => any | Promise<any>;
 
 	/**
-     * Called when a client successfully establishes a WebSocket connection.
-     * Use for initialization, authentication, sending welcome messages, etc.
-     *
-     * @param connection - The WebSocket connection instance
-     * @param request - The original HTTP upgrade request
-     *
-     * @throws If this function throws, onError is called (if defined).
-     *         If onError is not defined, an error message is sent to the client
-     *         and the connection is closed with code 1011.
-     *
-     * @example
-     * onConnect: async (connection, request) => {
-     *   // Store user info from headers
-     *   const userId = request.headers['x-user-id'];
-     *   connection.metadata.userId = userId;
-     *
-     *   // Join default room
-     *   connection.joinRoom('lobby');
-     *
-     *   // Send welcome message
-     *   await connection.send({
-     *     type: 'welcome',
-     *     message: 'Connected successfully',
-     *     userId
-     *   });
-     *
-     *   // Notify others
-     *   connection.broadcast({
-     *     type: 'user-joined',
-     *     userId
-     *   }, { room: 'lobby' });
-     * }
-     */
+	 * Called when a client successfully establishes a WebSocket connection.
+	 * Use for initialization, authentication, sending welcome messages, etc.
+	 *
+	 * @param connection - The WebSocket connection instance
+	 * @param request - The original HTTP upgrade request
+	 *
+	 * @throws If this function throws, onError is called (if defined).
+	 *         If onError is not defined, an error message is sent to the client
+	 *         and the connection is closed with code 1011.
+	 *
+	 * @example
+	 * onConnect: async (connection, request) => {
+	 *   // Store user info from headers
+	 *   const userId = request.headers['x-user-id'];
+	 *   connection.metadata.userId = userId;
+	 *
+	 *   // Join default room
+	 *   connection.joinRoom('lobby');
+	 *
+	 *   // Send welcome message
+	 *   await connection.send({
+	 *     type: 'welcome',
+	 *     message: 'Connected successfully',
+	 *     userId
+	 *   });
+	 *
+	 *   // Notify others
+	 *   connection.broadcast({
+	 *     type: 'user-joined',
+	 *     userId
+	 *   }, { room: 'lobby' });
+	 * }
+	 */
 	onConnect?: (connection: IWebSocketConnection, request: IncomingMessage) => void | Promise<void>;
 
 	/**
-     * Called when a Ping frame is received from the client.
-     *
-     * **Important**: If this callback is defined, automatic pong response is DISABLED.
-     * You must manually call `connection.pong()` if you want to respond.
-     *
-     * If this callback is NOT defined, server automatically responds with pong.
-     *
-     * @param connection - The WebSocket connection instance
-     * @param data - Optional payload from the ping frame
-     *
-     * @example
-     * // Manual pong with latency measurement
-     * onPing: (connection, data) => {
-     *   const timestamp = data.toString('utf8');
-     *   const latency = Date.now() - parseInt(timestamp);
-     *   console.log(`Latency: ${latency}ms`);
-     *   connection.pong(data); // Echo back
-     * }
-     *
-     * @example
-     * // Ignore pings (no automatic response)
-     * onPing: (connection, data) => {
-     *   console.log('Ping received, not responding');
-     * }
-     */
+	 * Called when a Ping frame is received from the client.
+	 *
+	 * **Important**: If this callback is defined, automatic pong response is DISABLED.
+	 * You must manually call `connection.pong()` if you want to respond.
+	 *
+	 * If this callback is NOT defined, server automatically responds with pong.
+	 *
+	 * @param connection - The WebSocket connection instance
+	 * @param data - Optional payload from the ping frame
+	 *
+	 * @example
+	 * // Manual pong with latency measurement
+	 * onPing: (connection, data) => {
+	 *   const timestamp = data.toString('utf8');
+	 *   const latency = Date.now() - parseInt(timestamp);
+	 *   console.log(`Latency: ${latency}ms`);
+	 *   connection.pong(data); // Echo back
+	 * }
+	 *
+	 * @example
+	 * // Ignore pings (no automatic response)
+	 * onPing: (connection, data) => {
+	 *   console.log('Ping received, not responding');
+	 * }
+	 */
 	onPing?: (connection: IWebSocketConnection, data: Buffer) => void | Promise<void>;
 
 	/**
-     * Called when a Pong frame is received from the client.
-     * Usually in response to a ping sent by the server.
-     * Useful for measuring round-trip time.
-     *
-     * @param connection - The WebSocket connection instance
-     * @param data - Optional payload from the pong frame
-     *
-     * @example
-     * // Measure latency
-     * let pingTimestamp: number;
-     *
-     * // On heartbeat interval
-     * connection.ping(Date.now().toString());
-     *
-     * // On pong received
-     * onPong: (connection, data) => {
-     *   const sentAt = parseInt(data.toString('utf8'));
-     *   const latency = Date.now() - sentAt;
-     *   connection.metadata.latency = latency;
-     *   console.log(`Client ${connection.id} latency: ${latency}ms`);
-     * }
-     */
+	 * Called when a Pong frame is received from the client.
+	 * Usually in response to a ping sent by the server.
+	 * Useful for measuring round-trip time.
+	 *
+	 * @param connection - The WebSocket connection instance
+	 * @param data - Optional payload from the pong frame
+	 *
+	 * @example
+	 * // Measure latency
+	 * let pingTimestamp: number;
+	 *
+	 * // On heartbeat interval
+	 * connection.ping(Date.now().toString());
+	 *
+	 * // On pong received
+	 * onPong: (connection, data) => {
+	 *   const sentAt = parseInt(data.toString('utf8'));
+	 *   const latency = Date.now() - sentAt;
+	 *   connection.metadata.latency = latency;
+	 *   console.log(`Client ${connection.id} latency: ${latency}ms`);
+	 * }
+	 */
 	onPong?: (connection: IWebSocketConnection, data: Buffer) => void | Promise<void>;
 
 	/**
-     * Called whenever a parsed message is received from the client.
-     * This is where main application logic typically lives.
-     *
-     * @param connection - The WebSocket connection instance
-     * @param message - The parsed message (type depends on transformRawData)
-     *
-     * @throws If this function throws, onError is called (if defined).
-     *         If onError is not defined, an error message is sent to the client.
-     *
-     * @example
-     * // Chat message handling
-     * onMessage: async (connection, message) => {
-     *   if (message.type === 'chat') {
-     *     // Broadcast to all in same room
-     *     const rooms = connection.getRooms();
-     *     rooms.forEach(room => {
-     *       connection.broadcast({
-     *         type: 'chat',
-     *         user: connection.metadata.username,
-     *         text: message.text,
-     *         timestamp: Date.now()
-     *       }, { room, includeSelf: false });
-     *     });
-     *   } else if (message.type === 'join-room') {
-     *     connection.joinRoom(message.room);
-     *     await connection.send({
-     *       type: 'joined',
-     *       room: message.room
-     *     });
-     *   }
-     * }
-     *
-     * @example
-     * // Game state update
-     * onMessage: async (connection, message) => {
-     *   switch (message.type) {
-     *     case 'move':
-     *       const gameRoom = connection.metadata.gameRoom;
-     *       const isValid = validateMove(message.move);
-     *
-     *       if (isValid) {
-     *         connection.broadcast({
-     *           type: 'move',
-     *           playerId: connection.id,
-     *           move: message.move
-     *         }, { room: gameRoom, includeSelf: true });
-     *       } else {
-     *         await connection.send({
-     *           type: 'error',
-     *           message: 'Invalid move'
-     *         });
-     *       }
-     *       break;
-     *   }
-     * }
-     */
+	 * Called whenever a parsed message is received from the client.
+	 * This is where main application logic typically lives.
+	 *
+	 * @param connection - The WebSocket connection instance
+	 * @param message - The parsed message (type depends on transformRawData)
+	 *
+	 * @throws If this function throws, onError is called (if defined).
+	 *         If onError is not defined, an error message is sent to the client.
+	 *
+	 * @example
+	 * // Chat message handling
+	 * onMessage: async (connection, message) => {
+	 *   if (message.type === 'chat') {
+	 *     // Broadcast to all in same room
+	 *     const rooms = connection.getRooms();
+	 *     rooms.forEach(room => {
+	 *       connection.broadcast({
+	 *         type: 'chat',
+	 *         user: connection.metadata.username,
+	 *         text: message.text,
+	 *         timestamp: Date.now()
+	 *       }, { room, includeSelf: false });
+	 *     });
+	 *   } else if (message.type === 'join-room') {
+	 *     connection.joinRoom(message.room);
+	 *     await connection.send({
+	 *       type: 'joined',
+	 *       room: message.room
+	 *     });
+	 *   }
+	 * }
+	 *
+	 * @example
+	 * // Game state update
+	 * onMessage: async (connection, message) => {
+	 *   switch (message.type) {
+	 *     case 'move':
+	 *       const gameRoom = connection.metadata.gameRoom;
+	 *       const isValid = validateMove(message.move);
+	 *
+	 *       if (isValid) {
+	 *         connection.broadcast({
+	 *           type: 'move',
+	 *           playerId: connection.id,
+	 *           move: message.move
+	 *         }, { room: gameRoom, includeSelf: true });
+	 *       } else {
+	 *         await connection.send({
+	 *           type: 'error',
+	 *           message: 'Invalid move'
+	 *         });
+	 *       }
+	 *       break;
+	 *   }
+	 * }
+	 */
 	onMessage?: (connection: IWebSocketConnection, message: any) => void | Promise<void>;
 
 	/**
-     * Called when the connection is closed.
-     * Use for cleanup, logging, notifying other users, etc.
-     *
-     * @param connection - The WebSocket connection instance
-     * @param code - WebSocket close code (1000 = normal, 1006 = abnormal, etc.)
-     * @param reason - Human-readable close reason
-     * @param initiatedByClient - True if client initiated the close
-     *
-     * @example
-     * onClose: (connection, code, reason, initiatedByClient) => {
-     *   console.log(`Client ${connection.id} disconnected: ${code} - ${reason}`);
-     *
-     *   // Notify others in same rooms
-     *   connection.getRooms().forEach(room => {
-     *     connection.broadcast({
-     *       type: 'user-left',
-     *       userId: connection.id
-     *     }, { room });
-     *   });
-     *
-     *   // Cleanup
-     *   database.updateUserStatus(connection.metadata.userId, 'offline');
-     * }
-     */
+	 * Called when the connection is closed.
+	 * Use for cleanup, logging, notifying other users, etc.
+	 *
+	 * @param connection - The WebSocket connection instance
+	 * @param code - WebSocket close code (1000 = normal, 1006 = abnormal, etc.)
+	 * @param reason - Human-readable close reason
+	 * @param initiatedByClient - True if client initiated the close
+	 *
+	 * @example
+	 * onClose: (connection, code, reason, initiatedByClient) => {
+	 *   console.log(`Client ${connection.id} disconnected: ${code} - ${reason}`);
+	 *
+	 *   // Notify others in same rooms
+	 *   connection.getRooms().forEach(room => {
+	 *     connection.broadcast({
+	 *       type: 'user-left',
+	 *       userId: connection.id
+	 *     }, { room });
+	 *   });
+	 *
+	 *   // Cleanup
+	 *   database.updateUserStatus(connection.metadata.userId, 'offline');
+	 * }
+	 */
 	onClose?: (connection: IWebSocketConnection, code?: number, reason?: string, initiatedByClient?: boolean) => void | Promise<void>;
 
 	/**
-     * Called whenever an error occurs during connection lifecycle.
-     * Includes errors from: onConnect, onMessage, response patterns, and socket errors.
-     *
-     * If not defined, default error handling applies:
-     * - Send error message to client
-     * - Log error to console
-     * - Close connection on critical errors
-     *
-     * @param connection - The WebSocket connection where error occurred
-     * @param error - The error object
-     *
-     * @example
-     * onError: (connection, error) => {
-     *   console.error(`Error on connection ${connection.id}:`, error);
-     *
-     *   // Send user-friendly error
-     *   connection.send({
-     *     type: 'error',
-     *     message: 'Something went wrong',
-     *     code: error.code
-     *   }).catch(() => {
-     *     // Connection might be dead, force close
-     *     connection.forceClose();
-     *   });
-     *
-     *   // Log to external service
-     *   errorLogger.log({
-     *     connectionId: connection.id,
-     *     userId: connection.metadata.userId,
-     *     error: error.message,
-     *     stack: error.stack
-     *   });
-     * }
-     */
+	 * Called whenever an error occurs during connection lifecycle.
+	 * Includes errors from: onConnect, onMessage, response patterns, and socket errors.
+	 *
+	 * If not defined, default error handling applies:
+	 * - Send error message to client
+	 * - Log error to console
+	 * - Close connection on critical errors
+	 *
+	 * @param connection - The WebSocket connection where error occurred
+	 * @param error - The error object
+	 *
+	 * @example
+	 * onError: (connection, error) => {
+	 *   console.error(`Error on connection ${connection.id}:`, error);
+	 *
+	 *   // Send user-friendly error
+	 *   connection.send({
+	 *     type: 'error',
+	 *     message: 'Something went wrong',
+	 *     code: error.code
+	 *   }).catch(() => {
+	 *     // Connection might be dead, force close
+	 *     connection.forceClose();
+	 *   });
+	 *
+	 *   // Log to external service
+	 *   errorLogger.log({
+	 *     connectionId: connection.id,
+	 *     userId: connection.metadata.userId,
+	 *     error: error.message,
+	 *     stack: error.stack
+	 *   });
+	 * }
+	 */
 	onError?: (connection: IWebSocketConnection, error: Error) => void | Promise<void>;
 
 	/**
-     * Optional authentication function.
-     * Called before WebSocket handshake completes.
-     *
-     * Return `true` to allow connection, `false` to reject with 401.
-     * Can be async for database lookups, token validation, etc.
-     *
-     * @param request - The HTTP upgrade request
-     * @returns True to allow, false to reject
-     *
-     * @throws If throws an error, connection is rejected with 500.
-     *
-     * @example
-     * // Token-based authentication
-     * authenticate: async (request) => {
-     *   const token = request.headers['authorization']?.replace('Bearer ', '');
-     *
-     *   if (!token) return false;
-     *
-     *   try {
-     *     const user = await verifyToken(token);
-     *     return user !== null;
-     *   } catch (error) {
-     *     return false;
-     *   }
-     * }
-     *
-     * @example
-     * // Session-based authentication
-     * authenticate: async (request) => {
-     *   const sessionId = parseCookies(request.headers.cookie).sessionId;
-     *   const session = await sessions.get(sessionId);
-     *   return session && session.authenticated;
-     * }
-     *
-     * @example
-     * // IP whitelist
-     * authenticate: (request) => {
-     *   const ip = request.socket.remoteAddress;
-     *   return allowedIPs.includes(ip);
-     * }
-     */
+	 * Optional authentication function.
+	 * Called before WebSocket handshake completes.
+	 *
+	 * Return `true` to allow connection, `false` to reject with 401.
+	 * Can be async for database lookups, token validation, etc.
+	 *
+	 * @param request - The HTTP upgrade request
+	 * @returns True to allow, false to reject
+	 *
+	 * @throws If throws an error, connection is rejected with 500.
+	 *
+	 * @example
+	 * // Token-based authentication
+	 * authenticate: async (request) => {
+	 *   const token = request.headers['authorization']?.replace('Bearer ', '');
+	 *
+	 *   if (!token) return false;
+	 *
+	 *   try {
+	 *     const user = await verifyToken(token);
+	 *     return user !== null;
+	 *   } catch (error) {
+	 *     return false;
+	 *   }
+	 * }
+	 *
+	 * @example
+	 * // Session-based authentication
+	 * authenticate: async (request) => {
+	 *   const sessionId = parseCookies(request.headers.cookie).sessionId;
+	 *   const session = await sessions.get(sessionId);
+	 *   return session && session.authenticated;
+	 * }
+	 *
+	 * @example
+	 * // IP whitelist
+	 * authenticate: (request) => {
+	 *   const ip = request.socket.remoteAddress;
+	 *   return allowedIPs.includes(ip);
+	 * }
+	 */
 	authenticate?: (request: IncomingMessage) => boolean | Promise<boolean>;
 
 	/**
-     * Array of automatic response rules.
-     * Processed in order; first matching rule is executed.
-     * If THERE IS A MATCH, onMessage callback is not executed.
-     *
-     * @example
-     * responses: [
-     *   // Echo server
-     *   {
-     *     match: (conn, msg) => msg.type === 'echo',
-     *     response: (conn, msg) => ({ type: 'echo', data: msg.data })
-     *   },
-     *
-     *   // Broadcast chat message
-     *   {
-     *     match: (conn, msg) => msg.type === 'chat',
-     *     response: (conn, msg) => ({
-     *       type: 'chat',
-     *       user: conn.metadata.username,
-     *       text: msg.text,
-     *       timestamp: Date.now()
-     *     }),
-     *     broadcast: true // Broadcast to sender's rooms
-     *   },
-     *
-     *   // Targeted broadcast
-     *   {
-     *     match: (conn, msg) => msg.type === 'game-action',
-     *     response: (conn, msg) => ({ type: 'action', data: msg.action }),
-     *     broadcast: {
-     *       room: 'game-123',
-     *       includeSelf: true // Include sender in broadcast
-     *     }
-     *   },
-     *
-     *   // No response (just side effects)
-     *   {
-     *     match: (conn, msg) => msg.type === 'typing',
-     *     response: (conn, msg) => {
-     *       conn.metadata.lastTyping = Date.now();
-     *       // Return void = no message sent
-     *     }
-     *   }
-     * ]
-     */
+	 * Array of automatic response rules.
+	 * Processed in order; first matching rule is executed.
+	 * If THERE IS A MATCH, onMessage callback is not executed.
+	 *
+	 * @example
+	 * responses: [
+	 *   // Echo server
+	 *   {
+	 *     match: (conn, msg) => msg.type === 'echo',
+	 *     response: (conn, msg) => ({ type: 'echo', data: msg.data })
+	 *   },
+	 *
+	 *   // Broadcast chat message
+	 *   {
+	 *     match: (conn, msg) => msg.type === 'chat',
+	 *     response: (conn, msg) => ({
+	 *       type: 'chat',
+	 *       user: conn.metadata.username,
+	 *       text: msg.text,
+	 *       timestamp: Date.now()
+	 *     }),
+	 *     broadcast: true // Broadcast to sender's rooms
+	 *   },
+	 *
+	 *   // Targeted broadcast
+	 *   {
+	 *     match: (conn, msg) => msg.type === 'game-action',
+	 *     response: (conn, msg) => ({ type: 'action', data: msg.action }),
+	 *     broadcast: {
+	 *       room: 'game-123',
+	 *       includeSelf: true // Include sender in broadcast
+	 *     }
+	 *   },
+	 *
+	 *   // No response (just side effects)
+	 *   {
+	 *     match: (conn, msg) => msg.type === 'typing',
+	 *     response: (conn, msg) => {
+	 *       conn.metadata.lastTyping = Date.now();
+	 *       // Return void = no message sent
+	 *     }
+	 *   }
+	 * ]
+	 */
 	responses?: {
 		/**
-         * Function to test if this response rule matches the message.
-         *
-         * @param connection - The connection that sent the message
-         * @param message - The parsed message
-         * @returns True if this rule should be applied
-         *
-         * @example
-         * // Match by message type
-         * match: (conn, msg) => msg.type === 'ping'
-         *
-         * @example
-         * // Match with condition
-         * match: (conn, msg) => {
-         *   return msg.type === 'admin-command' &&
-         *          conn.metadata.role === 'admin';
-         * }
-         *
-         * @example
-         * // Match by room
-         * match: (conn, msg) => {
-         *   return msg.type === 'broadcast' &&
-         *          conn.isInRoom('moderators');
-         * }
-         */
+		 * Function to test if this response rule matches the message.
+		 *
+		 * @param connection - The connection that sent the message
+		 * @param message - The parsed message
+		 * @returns True if this rule should be applied
+		 *
+		 * @example
+		 * // Match by message type
+		 * match: (conn, msg) => msg.type === 'ping'
+		 *
+		 * @example
+		 * // Match with condition
+		 * match: (conn, msg) => {
+		 *   return msg.type === 'admin-command' &&
+		 *          conn.metadata.role === 'admin';
+		 * }
+		 *
+		 * @example
+		 * // Match by room
+		 * match: (conn, msg) => {
+		 *   return msg.type === 'broadcast' &&
+		 *          conn.isInRoom('moderators');
+		 * }
+		 */
 		match: (connection: IWebSocketConnection, message: any) => boolean;
 
 		/**
-         * The response to send when match succeeds.
-         *
-         * Can be:
-         * - Static value: Sent as-is (serialized to JSON)
-         * - Function: Called with connection and message, returns response
-         * - Function returning void: No response sent (useful for side effects only)
-         *
-         * @param connection - The connection that sent the message
-         * @param message - The matched message
-         * @returns Response data or void (no response)
-         *
-         * @example
-         * // Static response
-         * response: { type: 'pong' }
-         *
-         * @example
-         * // Dynamic response
-         * response: (conn, msg) => ({
-         *   type: 'response',
-         *   data: processData(msg.data),
-         *   timestamp: Date.now()
-         * })
-         *
-         * @example
-         * // Side effects only (no response)
-         * response: (conn, msg) => {
-         *   updateDatabase(msg);
-         *   // No return = no message sent
-         * }
-         *
-         * @example
-         * // Conditional response
-         * response: (conn, msg) => {
-         *   if (msg.priority === 'high') {
-         *     return { type: 'ack', fast: true };
-         *   }
-         *   // Return undefined = no response
-         * }
-         */
+		 * The response to send when match succeeds.
+		 *
+		 * Can be:
+		 * - Static value: Sent as-is (serialized to JSON)
+		 * - Function: Called with connection and message, returns response
+		 * - Function returning void: No response sent (useful for side effects only)
+		 *
+		 * @param connection - The connection that sent the message
+		 * @param message - The matched message
+		 * @returns Response data or void (no response)
+		 *
+		 * @example
+		 * // Static response
+		 * response: { type: 'pong' }
+		 *
+		 * @example
+		 * // Dynamic response
+		 * response: (conn, msg) => ({
+		 *   type: 'response',
+		 *   data: processData(msg.data),
+		 *   timestamp: Date.now()
+		 * })
+		 *
+		 * @example
+		 * // Side effects only (no response)
+		 * response: (conn, msg) => {
+		 *   updateDatabase(msg);
+		 *   // No return = no message sent
+		 * }
+		 *
+		 * @example
+		 * // Conditional response
+		 * response: (conn, msg) => {
+		 *   if (msg.priority === 'high') {
+		 *     return { type: 'ack', fast: true };
+		 *   }
+		 *   // Return undefined = no response
+		 * }
+		 */
 		response: ((connection: IWebSocketConnection, message: any) => any | void) | string | number | boolean | bigint | Buffer | Uint8Array | object | any[] | null | undefined;
 
 		/**
@@ -1365,32 +1381,319 @@ export type UniversalApiWsHandler = {
 	}[];
 
 	/**
-     * Optional default room for this handler.
-     * Clients automatically join this room upon connecting.
-     *
-     * Set to `false` to disable default room.
-     *
-     * @example
-     * // Auto-join lobby
-     * defaultRoom: "lobby"
-     *
-     * @example
-     * // No default room
-     * defaultRoom: false
-     *
-     * @example
-     * // Combined with manual room management
-     * {
-     *   defaultRoom: "waiting-room",
-     *   onMessage: (connection, message) => {
-     *     if (message.type === 'join-game') {
-     *       connection.leaveRoom('waiting-room');
-     *       connection.joinRoom(`game-${message.gameId}`);
-     *     }
-     *   }
-     * }
-     */
+	 * Optional default room for this handler.
+	 * Clients automatically join this room upon connecting.
+	 *
+	 * Set to `false` to disable default room.
+	 *
+	 * @example
+	 * // Auto-join lobby
+	 * defaultRoom: "lobby"
+	 *
+	 * @example
+	 * // No default room
+	 * defaultRoom: false
+	 *
+	 * @example
+	 * // Combined with manual room management
+	 * {
+	 *   defaultRoom: "waiting-room",
+	 *   onMessage: (connection, message) => {
+	 *     if (message.type === 'join-game') {
+	 *       connection.leaveRoom('waiting-room');
+	 *       connection.joinRoom(`game-${message.gameId}`);
+	 *     }
+	 *   }
+	 * }
+	 */
 	defaultRoom?: string | false;
+};
+
+type UniversalApiBaseOptions = {
+	/**
+	 * Completely disable the plugin.
+	 * Useful for production builds or conditional enabling.
+	 *
+	 * @default false
+	 *
+	 * @example
+	 * disable: process.env.NODE_ENV === 'production'
+	 */
+	disable?: boolean;
+
+	/**
+	 * Logging verbosity level.
+	 *
+	 * - `"silent"`: No logs
+	 * - `"error"`: Only errors
+	 * - `"warn"`: Warnings and errors
+	 * - `"info"`: General information (recommended)
+	 * - `"debug"`: Verbose debugging information
+	 *
+	 * @default "info"
+	 *
+	 * @example
+	 * logLevel: "debug" // For development
+	 *
+	 * @example
+	 * logLevel: "silent" // For production
+	 */
+	logLevel?: LogLevel | "debug";
+
+	/**
+	 * Simulate a gateway timeout by forcing 504 response after specified milliseconds.
+	 * Does NOT stop handler execution, only changes the response status.
+	 * Not applicable for WebSocket requests.
+	 *
+	 * @example
+	 * gatewayTimeout: 5000 // 5 second timeout
+	 */
+	gatewayTimeout?: number;
+
+	/**
+	 * Global artificial delay in milliseconds before sending responses.
+	 * Useful for testing loading states and simulating network latency.
+	 * Can be overridden per handler.
+	 * Not applicable for WebSocket requests.
+	 *
+	 * @default 0
+	 *
+	 * @example
+	 * delay: 1000 // 1 second delay for all responses
+	 */
+	delay?: number;
+
+	/**
+	 * URL prefix(es) that the plugin will intercept and handle.
+	 * Requests not starting with these prefixes are passed through.
+	 *
+	 * @default "/api"
+	 *
+	 * @example
+	 * // Single prefix
+	 * endpointPrefix: "/api"
+	 *
+	 * @example
+	 * // Multiple prefixes
+	 * endpointPrefix: ["/api", "/v1", "/mock"]
+	 */
+	endpointPrefix?: string | string[];
+
+	/**
+	 * Directory path for file-based handlers, relative to vite.config location.
+	 * Used when handler `handle` option is set to "FS".
+	 *
+	 * Set to `null` to disable file-based routing entirely.
+	 *
+	 * @example
+	 * fsDir: "./mock-data"
+	 * // File structure:
+	 * // mock-data/
+	 * //   api/
+	 * //     users.json
+	 * //     products.json
+	 *
+	 * @example
+	 * fsDir: null // Disable file-based routing
+	 */
+	fsDir?: string | null;
+
+	/**
+	 * Enable the plugin in preview mode (`vite preview`).
+	 * When `false`, the plugin does not intercept requests in preview mode.
+	 *
+	 * @default true
+	 *
+	 * @example
+	 * enablePreview: false // Disable plugin in preview mode
+	 */
+	enablePreview?: boolean;
+
+	/**
+	 * Behavior for requests that don't match any handler pattern.
+	 *
+	 * - `"404"`: Return 404 Not Found
+	 * - `"forward"`: Pass request to next Vite middleware
+	 *
+	 * @default "404"
+	 *
+	 * @example
+	 * // Return 404 for unmatched requests
+	 * noHandledRestFsRequestsAction: "404"
+	 *
+	 * @example
+	 * // Forward to Vite's default handler (e.g., serve static files)
+	 * noHandledRestFsRequestsAction: "forward"
+	 */
+	noHandledRestFsRequestsAction?: "404" | "forward";
+
+	/**
+	 * Request body parsing configuration.
+	 * Determines how request body, query params, and route params are parsed.
+	 * Executed after handlerMiddlewares.
+	 * Not applicable for WebSocket requests.
+	 *
+	 * - `true`: Enable built-in simple parser (JSON + form data)
+	 * - `false`: Disable all parsing
+	 * - Object: Use custom parser with transformation
+	 *
+	 * @default true
+	 *
+	 * @example
+	 * // Use built-in parser
+	 * parser: true
+	 *
+	 * @example
+	 * // Disable parsing
+	 * parser: false
+	 *
+	 * @example
+	 * // Custom parser
+	 * parser: {
+	 *   parser: [express.json(), express.urlencoded({ extended: true })],
+	 *   transform: (req) => ({
+	 *     body: req.body,
+	 *     query: new URLSearchParams(req.url.split('?')[1])
+	 *   })
+	 * }
+	 */
+	parser?: UniversalApiParser;
+
+	/**
+	 * Middleware functions executed before each handler.
+	 * Similar to Express middleware, executed in order.
+	 *
+	 * @example
+	 * handlerMiddlewares: [
+	 *   // Logging middleware
+	 *   async (req, res, next) => {
+	 *     console.log(`${req.method} ${req.url}`);
+	 *     next();
+	 *   },
+	 *
+	 *   // Auth middleware
+	 *   async (req, res, next) => {
+	 *     const token = req.headers.authorization;
+	 *     if (!token) {
+	 *       res.writeHead(401);
+	 *       res.end('Unauthorized');
+	 *       return;
+	 *     }
+	 *     req.body.user = await verifyToken(token);
+	 *     next();
+	 *   }
+	 * ]
+	 */
+	handlerMiddlewares?: UniversalApiMiddleware[];
+
+	/**
+	 * Error handling middleware functions.
+	 * Called when an error occurs during request processing.
+	 * Executed in order, similar to Express error middleware.
+	 * Not applicable for WebSocket requests.
+	 *
+	 * @example
+	 * errorMiddlewares: [
+	 *   // Validation error handler
+	 *   (err, req, res, next) => {
+	 *     if (err.name === 'ValidationError') {
+	 *       res.writeHead(400, { 'Content-Type': 'application/json' });
+	 *       res.end(JSON.stringify({ error: err.message }));
+	 *     } else {
+	 *       next(err);
+	 *     }
+	 *   },
+	 *
+	 *   // Generic error handler
+	 *   (err, req, res, next) => {
+	 *     console.error('Unhandled error:', err);
+	 *     res.writeHead(500, { 'Content-Type': 'application/json' });
+	 *     res.end(JSON.stringify({ error: 'Internal server error' }));
+	 *   }
+	 * ]
+	 */
+	errorMiddlewares?: UniversalApiErrorMiddleware[];
+
+	/**
+	 * REST API handler configurations.
+	 * Defines how HTTP requests are processed.
+	 * If omitted, plugin only handles file-based requests.
+	 *
+	 * @example
+	 * handlers: [
+	 *   {
+	 *     pattern: '/api/users',
+	 *     method: 'GET',
+	 *     handle: 'FS'
+	 *   },
+	 *   {
+	 *     pattern: '/api/auth/login',
+	 *     method: 'POST',
+	 *     handle: async (req, res) => {
+	 *       const { username, password } = req.body;
+	 *       const token = await authenticate(username, password);
+	 *       res.writeHead(200, { 'Content-Type': 'application/json' });
+	 *       res.end(JSON.stringify({ token }));
+	 *     }
+	 *   }
+	 * ]
+	 */
+	handlers?: UniversalApiRestFsHandler[];
+
+	/**
+	 * Global paginatio	n configuration for file-based endpoints.
+	 * Can be configured per HTTP method or for all methods.
+	 * Only works with JSON files containing arrays.
+	 * Not applicable for WebSocket requests.
+	 *
+	 * @example
+	 * // Pagination for all GET requests
+	 * pagination: {
+	 *   ALL: {
+	 *     type: "query-param",
+	 *     limit: "limit",
+	 *     skip: "skip",
+	 *     sort: "sortBy",
+	 *     order: "order"
+	 *   }
+	 * }
+	 *
+	 * @example
+	 * // Different pagination per method
+	 * pagination: {
+	 *   GET: {
+	 *     type: "query-param",
+	 *     limit: "pageSize",
+	 *     skip: "page"
+	 *   },
+	 *   POST: {
+	 *     type: "body",
+	 *     root: "pagination",
+	 *     limit: "limit",
+	 *     skip: "offset"
+	 *   }
+	 * }
+	 */
+	pagination?: Partial<Record<string, UniversalApiPagination>> | null;
+
+	/**
+	 * Global filter configuration for file-based endpoints.
+	 * Can be configured per HTTP method or for all methods.
+	 * Only works with JSON files containing arrays.
+	 * Not applicable for WebSocket requests.
+	 *
+	 * @example
+	 * filters: {
+	 *   ALL: {
+	 *     type: "query-param",
+	 *     filters: [
+	 *       { key: "status", valueType: "string", comparison: "eq" },
+	 *       { key: "age", valueType: "number", comparison: "gte" }
+	 *     ]
+	 *   }
+	 * }
+	 */
+	filters?: Partial<Record<string, UniversalApiFilter>> | null;
 };
 
 /**
@@ -1424,319 +1727,27 @@ export type UniversalApiWsHandler = {
  *   ]
  * }
  */
-export type UniversalApiOptions =
-	{
+export type UniversalApiOptions = UniversalApiBaseOptions & (
+	| {
 		/**
-		 * Completely disable the plugin.
-		 * Useful for production builds or conditional enabling.
-		 *
-		 * @default false
-		 *
-		 * @example
-		 * disable: process.env.NODE_ENV === 'production'
-		 */
-		disable?: boolean;
-
-		/**
-		 * Logging verbosity level.
-		 *
-		 * - `"silent"`: No logs
-		 * - `"error"`: Only errors
-		 * - `"warn"`: Warnings and errors
-		 * - `"info"`: General information (recommended)
-		 * - `"debug"`: Verbose debugging information
-		 *
-		 * @default "info"
-		 *
-		 * @example
-		 * logLevel: "debug" // For development
-		 *
-		 * @example
-		 * logLevel: "silent" // For production
-		 */
-		logLevel?: LogLevel | "debug";
-
-		/**
-		 * Simulate a gateway timeout by forcing 504 response after specified milliseconds.
-		 * Does NOT stop handler execution, only changes the response status.
-		 * Not applicable for WebSocket requests.
-		 *
-		 * @example
-		 * gatewayTimeout: 5000 // 5 second timeout
-		 */
-		gatewayTimeout?: number;
-
-		/**
-		 * Global artificial delay in milliseconds before sending responses.
-		 * Useful for testing loading states and simulating network latency.
-		 * Can be overridden per handler.
-		 * Not applicable for WebSocket requests.
-		 *
-		 * @default 0
-		 *
-		 * @example
-		 * delay: 1000 // 1 second delay for all responses
-		 */
-		delay?: number;
-
-		/**
-		 * URL prefix(es) that the plugin will intercept and handle.
-		 * Requests not starting with these prefixes are passed through.
-		 *
-		 * @default "/api"
-		 *
-		 * @example
-		 * // Single prefix
-		 * endpointPrefix: "/api"
-		 *
-		 * @example
-		 * // Multiple prefixes
-		 * endpointPrefix: ["/api", "/v1", "/mock"]
-		 */
-		endpointPrefix?: string | string[];
-
-		/**
-		 * Directory path for file-based handlers, relative to vite.config location.
-		 * Used when handler `handle` option is set to "FS".
-		 *
-		 * Set to `null` to disable file-based routing entirely.
-		 *
-		 * @example
-		 * fsDir: "./mock-data"
-		 * // File structure:
-		 * // mock-data/
-		 * //   api/
-		 * //     users.json
-		 * //     products.json
-		 *
-		 * @example
-		 * fsDir: null // Disable file-based routing
-		 */
-		fsDir?: string | null;
-
-		/**
-		 * Enable WebSocket support.
-		 * When `true`, `wsHandlers` option becomes required.
-		 *
-		 * @default false
-		 *
-		 * @example
-		 * enableWs: true
+		 * WebSocket support disabled.
 		 */
 		enableWs?: false | undefined;
-
-		/**
-		 * Behavior for requests that don't match any handler pattern.
-		 *
-		 * - `"404"`: Return 404 Not Found
-		 * - `"forward"`: Pass request to next Vite middleware
-		 *
-		 * @default "404"
-		 *
-		 * @example
-		 * // Return 404 for unmatched requests
-		 * noHandledRestFsRequestsAction: "404"
-		 *
-		 * @example
-		 * // Forward to Vite's default handler (e.g., serve static files)
-		 * noHandledRestFsRequestsAction: "forward"
-		 */
-		noHandledRestFsRequestsAction?: "404" | "forward";
-
-		/**
-		 * Request body parsing configuration.
-		 * Determines how request body, query params, and route params are parsed.
-		 * Executed after handlerMiddlewares.
-		 * Not applicable for WebSocket requests.
-		 *
-		 * - `true`: Enable built-in simple parser (JSON + form data)
-		 * - `false`: Disable all parsing
-		 * - Object: Use custom parser with transformation
-		 *
-		 * @default true
-		 *
-		 * @example
-		 * // Use built-in parser
-		 * parser: true
-		 *
-		 * @example
-		 * // Disable parsing
-		 * parser: false
-		 *
-		 * @example
-		 * // Custom parser
-		 * parser: {
-		 *   parser: [express.json(), express.urlencoded({ extended: true })],
-		 *   transform: (req) => ({
-		 *     body: req.body,
-		 *     query: new URLSearchParams(req.url.split('?')[1])
-		 *   })
-		 * }
-		 */
-		parser?: UniversalApiParser;
-
-		/**
-		 * Middleware functions executed before each handler.
-		 * Similar to Express middleware, executed in order.
-		 * Not applicable for FS handlers or WebSocket requests.
-		 *
-		 * @example
-		 * handlerMiddlewares: [
-		 *   // Logging middleware
-		 *   async (req, res, next) => {
-		 *     console.log(`${req.method} ${req.url}`);
-		 *     next();
-		 *   },
-		 *
-		 *   // Auth middleware
-		 *   async (req, res, next) => {
-		 *     const token = req.headers.authorization;
-		 *     if (!token) {
-		 *       res.writeHead(401);
-		 *       res.end('Unauthorized');
-		 *       return;
-		 *     }
-		 *     req.body.user = await verifyToken(token);
-		 *     next();
-		 *   }
-		 * ]
-		 */
-		handlerMiddlewares?: UniversalApiMiddleware[];
-
-		/**
-		 * Error handling middleware functions.
-		 * Called when an error occurs during request processing.
-		 * Executed in order, similar to Express error middleware.
-		 * Not applicable for WebSocket requests.
-		 *
-		 * @example
-		 * errorMiddlewares: [
-		 *   // Validation error handler
-		 *   (err, req, res, next) => {
-		 *     if (err.name === 'ValidationError') {
-		 *       res.writeHead(400, { 'Content-Type': 'application/json' });
-		 *       res.end(JSON.stringify({ error: err.message }));
-		 *     } else {
-		 *       next(err);
-		 *     }
-		 *   },
-		 *
-		 *   // Generic error handler
-		 *   (err, req, res, next) => {
-		 *     console.error('Unhandled error:', err);
-		 *     res.writeHead(500, { 'Content-Type': 'application/json' });
-		 *     res.end(JSON.stringify({ error: 'Internal server error' }));
-		 *   }
-		 * ]
-		 */
-		errorMiddlewares?: UniversalApiErrorMiddleware[];
-
-		/**
-		 * REST API handler configurations.
-		 * Defines how HTTP requests are processed.
-		 * If omitted, plugin only handles file-based requests.
-		 *
-		 * @example
-		 * handlers: [
-		 *   {
-		 *     pattern: '/api/users',
-		 *     method: 'GET',
-		 *     handle: 'FS'
-		 *   },
-		 *   {
-		 *     pattern: '/api/auth/login',
-		 *     method: 'POST',
-		 *     handle: async (req, res) => {
-		 *       const { username, password } = req.body;
-		 *       const token = await authenticate(username, password);
-		 *       res.writeHead(200, { 'Content-Type': 'application/json' });
-		 *       res.end(JSON.stringify({ token }));
-		 *     }
-		 *   }
-		 * ]
-		 */
-		handlers?: UniversalApiRestFsHandler[];
-
 		/**
 		 * WebSocket handlers (not allowed when enableWs is false/undefined).
 		 */
 		wsHandlers?: never;
-
-		/**
-		 * Global pagination configuration for file-based endpoints.
-		 * Can be configured per HTTP method or for all methods.
-		 * Only works with JSON files containing arrays.
-		 * Not applicable for WebSocket requests.
-		 *
-		 * @example
-		 * // Pagination for all GET requests
-		 * pagination: {
-		 *   ALL: {
-		 *     type: "query-param",
-		 *     limit: "limit",
-		 *     skip: "skip",
-		 *     sort: "sortBy",
-		 *     order: "order"
-		 *   }
-		 * }
-		 *
-		 * @example
-		 * // Different pagination per method
-		 * pagination: {
-		 *   GET: {
-		 *     type: "query-param",
-		 *     limit: "pageSize",
-		 *     skip: "page"
-		 *   },
-		 *   POST: {
-		 *     type: "body",
-		 *     root: "pagination",
-		 *     limit: "limit",
-		 *     skip: "offset"
-		 *   }
-		 * }
-		 */
-		pagination?: Partial<Record<"ALL" | "HEAD" | "GET" | "POST" | "DELETE", UniversalApiPagination>> | null;
-
-		/**
-		 * Global filter configuration for file-based endpoints.
-		 * Can be configured per HTTP method or for all methods.
-		 * Only works with JSON files containing arrays.
-		 * Not applicable for WebSocket requests.
-		 *
-		 * @example
-		 * filters: {
-		 *   ALL: {
-		 *     type: "query-param",
-		 *     filters: [
-		 *       { key: "status", valueType: "string", comparison: "eq" },
-		 *       { key: "age", valueType: "number", comparison: "gte" }
-		 *     ]
-		 *   }
-		 * }
-		 */
-		filters?: Partial<Record<"ALL" | "HEAD" | "GET" | "POST" | "DELETE", UniversalApiFilter>> | null;
-	} | {
-		disable?: boolean;
-		logLevel?: LogLevel | "debug";
-		gatewayTimeout?: number;
-		delay?: number;
-		endpointPrefix?: string | string[];
-		fsDir?: string | null;
+	}
+	| {
 		/**
 		 * Enable WebSocket support.
 		 * When true, wsHandlers becomes required.
 		 *
 		 * @default false
 		 */
-		enableWs?: true;
-		noHandledRestFsRequestsAction?: "404" | "forward";
-		parser?: UniversalApiParser;
-		handlerMiddlewares?: UniversalApiMiddleware[];
-		errorMiddlewares?: UniversalApiErrorMiddleware[];
-		handlers?: UniversalApiRestFsHandler[];
+		enableWs: true;
 		/**
-		 * WebSocket handler configurations (required when enableWs is true).
+		 * WebSocket handler configurations.
 		 *
 		 * @example
 		 * wsHandlers: [
@@ -1755,20 +1766,19 @@ export type UniversalApiOptions =
 		 *   }
 		 * ]
 		 */
-		wsHandlers?: UniversalApiWsHandler[];
-		pagination?: Partial<Record<"ALL" | "HEAD" | "GET" | "POST" | "DELETE", UniversalApiPagination>> | null;
-		filters?: Partial<Record<"ALL" | "HEAD" | "GET" | "POST" | "DELETE", UniversalApiFilter>> | null;
+		wsHandlers: UniversalApiWsHandler[];
 	}
+);
 
 /** @internal */
 export type UniversalApiOptionsRequired = Omit<Required<UniversalApiOptions>, "handlerMiddlewares" | "endpointPrefix"> & { endpointPrefix: string[], fullFsDir: string | null, config: ResolvedConfig, matcher: AntPathMatcher, middlewares: UniversalApiMiddleware[] };
 
 /** @internal */
 export interface HandledRequestData {
-    status: number | null,
+	status: number | null,
 	data: any | null;
-    headers: {
-        name: string;
+	headers: {
+		name: string;
 		value: string | number | readonly string[];
 	}[];
 }
