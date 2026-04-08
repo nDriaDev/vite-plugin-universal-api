@@ -565,497 +565,6 @@ const runPluginInternal = async (req: IncomingMessage, res: ServerResponse, logg
 	}
 }
 
-async function handleControlFrame(frame: WebSocketFrame, connection: IWebSocketConnection, handler: UniversalApiWsHandler, logger: ILogger) {
-	logger.debug(`handleControlFrame: START`);
-	let result = false;
-	// INFO CLOSE FRAME
-	if (frame.opcode === 0x08) {
-		let code = 1000;
-		let reason = "";
-		if (frame.payload.length >= 2) {
-			if (frame.payload.length > 125) {
-				logger.debug(`handleControlFrame: Close frame payload too long: ${frame.payload.length}`);
-				code = 1002;
-				reason = "Protocol error: close payload too long";
-			} else {
-				code = frame.payload.readUInt16BE(0);
-				if (!Utils.ws.isValidCloseCode(code)) {
-					logger.debug(`handleControlFrame: Invalid close code: ${code}`);
-					code = 1002;
-					reason = "Protocol error: invalid close code";
-				} else if (frame.payload.length > 2) {
-					const reasonBuffer = frame.payload.subarray(2);
-					try {
-						reason = reasonBuffer.toString('utf-8');
-						// INFO Verify that the decoding did not produce replacement characters
-						if (reason.includes('\uFFFD')) {
-							throw new Error('Invalid UTF-8');
-						}
-					} catch (_) {
-						logger.debug(`handleControlFrame: Invalid UTF-8 in close reason`);
-						code = 1002;
-						reason = "Protocol error: invalid UTF-8 in close reason";
-					}
-				}
-			}
-		} else if (frame.payload.length === 1) {
-			// INFO Close frame with 1 byte is invalid (code requires 2 bytes)
-			logger.debug(`handleControlFrame: Invalid close frame payload length: 1`);
-			code = 1002;
-			reason = "Protocol error: invalid close payload";
-		}
-		if (!connection.closed) {
-			if (handler.onClose) {
-				await handler.onClose(connection, code, reason, false);
-			}
-			!connection.closed && await connection.close(code, reason, false);
-		}
-		result = true;
-	}
-	// INFO PING FRAME
-	if (frame.opcode === 0x09) {
-		connection.resetMissedPong();
-		if (handler.onPing) {
-			try {
-				await handler.onPing(connection, frame.payload);
-			} catch (error: any) {
-				logger.debug(`handleControlFrame: error in ping handler - `, error);
-				if (handler.onError) {
-					await handler.onError(connection, error);
-				} else {
-					logger.error(`handleControlFrame: error in ping handler - `, error);
-					await connection.send({
-						type: "error",
-						message: (error as Error).message
-					});
-				}
-			}
-		} else {
-			connection.pong(frame.payload);
-		}
-		result = true;
-	}
-	// INFO PONG FRAME
-	if (frame.opcode === 0x0A) {
-		if (handler.onPong) {
-			try {
-				await handler.onPong(connection, frame.payload);
-			} catch (error: any) {
-				logger.debug(`handleControlFrame: error in pong handler - `, error);
-				if (handler.onError) {
-					await handler.onError(connection, error);
-				} else {
-					logger.error(`handleControlFrame: error in pong handler - `, error);
-					await connection.send({
-						type: "error",
-						message: "Pong handler error"
-					});
-				}
-			}
-		}
-		result = true;
-	}
-	logger.debug(`handleControlFrame END`);
-	return result;
-}
-
-async function validateFrame(frame: WebSocketFrame, connection: IWebSocketConnection, handler: UniversalApiWsHandler, logger: ILogger) {
-	logger.debug(`validateFrame START`);
-	let result = true;
-	let reason = "";
-	// INFO UNKNOWN OR RESERVED OPCODE
-	if (frame.opcode > 0x0A || (frame.opcode >= 0x03 && frame.opcode <= 0x07)) {
-		logger.debug(`validateFrame: Unknown/reserved opcode: ${frame.opcode}`);
-		reason = "Protocol error: unknown opcode";
-		result = false;
-	}
-	// INFO Check RSV2/RSV3
-    if (result && (frame.rsv2 || frame.rsv3)) {
-        logger.debug(`validateFrame: Invalid RSV2/RSV3 flags`);
-		reason = "Protocol error: invalid RSV flags";
-        result = false;
-	}
-	// INFO Check RSV1
-    if (result && frame.rsv1 && !connection.perMessageDeflate) {
-        logger.debug(`validateFrame: RSV1 set without compression extension`);
-		reason = "Protocol error: unexpected RSV1";
-		result = false;
-	}
-	if (reason !== "" && !result) {
-		if (!connection.closed) {
-			if (handler.onClose) {
-				await handler.onClose(connection, 1002, reason, false);
-			}
-			!connection.closed && await connection.close(1002, reason, false);
-		}
-	}
-	logger.debug(`validateFrame END`);
-	return result;
-}
-
-async function handleResponsesMatching(connection: IWebSocketConnection, handler: UniversalApiWsHandler, message: any, logger: ILogger) {
-	logger.debug(`handleResponsesMatching: START`);
-	let result = false;
-	if (handler.responses && handler.responses.length > 0) {
-		let response: Exclude<typeof handler["responses"], undefined | null>[number] | null = null;
-		let error: any = null;
-		for (const resp of handler.responses) {
-			try {
-				if (resp.match(connection, message)) {
-					response = resp;
-					break;
-				}
-			} catch (err) {
-				error = err;
-			}
-		}
-		if (response !== null) {
-			result = true;
-			try {
-				let responseData = response.response;
-				if (typeof responseData === "function") {
-					responseData = await responseData(connection, message);
-				}
-				if (response.broadcast) {
-                    if (typeof response.broadcast === "boolean") {
-                        connection.broadcastAllRooms(responseData, false);
-                    } else {
-                        connection.broadcast(responseData, {
-                            room: response.broadcast.room,
-                            includeSelf: response.broadcast.includeSelf ?? false
-                        });
-                    }
-                } else {
-                    await connection.send(responseData);
-                }
-			} catch (err: any) {
-				logger.debug(`handleResponsesMatching: Error in handler response match execution - `, err);
-				if (handler.onError) {
-					await handler.onError(connection, err);
-				} else {
-					logger.error(`handleResponsesMatching: Error in handler response match execution - `, err);
-					await connection.send({
-						type: 'error',
-						message: (err as Error)?.message
-					});
-				}
-			}
-		} else {
-			if (error) {
-				result = true;
-				logger.debug(`handleResponsesMatching: Error matching response pattern - `, error);
-				if (handler.onError) {
-					await handler.onError(connection, error);
-				} else {
-					logger.error(`handleResponsesMatching: Error matching response pattern - `, error);
-					await connection.send({
-						type: 'error',
-						message: (error as Error)?.message
-					});
-				}
-			}
-		}
-	}
-	logger.debug(`handleResponsesMatching: END`);
-	return result;
-}
-
-async function handleDataFrame(frame: WebSocketFrame, connection: IWebSocketConnection, handler: UniversalApiWsHandler, logger: ILogger) {
-	logger.debug(`handleDataFrame START`);
-	try {
-		const result = connection.accumulateFragment(frame);
-		if (!result) {
-			return;
-		}
-		let payload = result.payload;
-		const originalOpcode = result.opcode;
-		// INFO Decompression
-		if (frame.rsv1) {
-			try {
-				payload = await connection.decompressData(result.payload);
-			} catch (err: any) {
-				logger.debug(`handleDataFrame: decompression error - `, err);
-				if (handler.onError) {
-					await handler.onError(connection, err);
-				} else {
-					logger.error(`handleDataFrame: decompression error - `, err);
-					await connection.send({
-						type: "error",
-						message: (err as Error).message
-					});
-				}
-				if (!connection.closed) {
-					await connection.close(1002, 'Protocol error', false);
-				}
-				return;
-			}
-		}
-		let message: any = payload;
-
-		if (handler.transformRawData) {
-			try {
-				message = await handler.transformRawData(message);
-			} catch (error: any) {
-				logger.debug(`handleDataFrame: error transforming raw data - `, error);
-				if (handler.onError) {
-					await handler.onError(connection, error);
-				} else {
-					logger.error(`handleDataFrame: error transforming raw data - `, error);
-					await connection.send({
-						type: 'error',
-						message: (error as Error).message
-					});
-				}
-			}
-		} else {
-			const {result, message: mess} = Utils.ws.transformPayloadToMessage(payload, originalOpcode);
-			if (!result) {
-				logger.debug(`handleDataFrame: Unexpected opcode for data frame ${originalOpcode}`);
-			} else {
-				message = mess;
-			}
-		}
-		if (handler.delay && handler.delay > 0) {
-			await new Promise(resolve => setTimeout(resolve, handler.delay));
-		}
-		const hasMatch = await handleResponsesMatching(connection, handler, message, logger);
-		if (!hasMatch && handler.onMessage) {
-			try {
-				await handler.onMessage(connection, message);
-			} catch (err: any) {
-				logger.debug(`handleDataFrame: Error in message handler - `, err);
-				if (handler.onError) {
-					await handler.onError(connection, err);
-				} else {
-					logger.error(`handleDataFrame: Error in message handler - `, err);
-					await connection.send({
-						type: 'error',
-						message: (err as Error).message
-					});
-				}
-			}
-		}
-	} finally {
-		logger.debug(`handleDataFrame END`);
-	}
-}
-
-async function processFrame(frame: WebSocketFrame, connection: IWebSocketConnection, handler: UniversalApiWsHandler, logger: ILogger) {
-	logger.debug(`processFrame: START`);
-	try {
-		const handled = await handleControlFrame(frame, connection, handler, logger);
-		if (handled) {
-			return;
-		}
-		const valid = await validateFrame(frame, connection, handler, logger);
-		if (!valid) {
-			return;
-		}
-		await handleDataFrame(frame, connection, handler, logger);
-	} catch (error: any) {
-		logger.debug(`processFrame: ERROR - `, error);
-		if (handler.onError) {
-			await handler.onError(connection, error);
-		} else {
-			await connection.send({
-				type: "error",
-				message: (error as Error).message
-			});
-		}
-		if (!connection.closed) {
-			await connection.close(1011, "Internal error", false);
-		}
-	} finally {
-		logger.debug(`processFrame: END`);
-	}
-}
-
-function handlingApiWsRequest(logger: ILogger, options: UniversalApiOptionsRequired) {
-	logger.debug(`handlingApiWsRequest: START`);
-	const { endpointPrefix, wsHandlers, matcher } = options;
-	const managers = new Map<UniversalApiWsHandler, ConnectionManager>();
-	logger.debug(`handlingApiWsRequest: initialize connection managers for enabled handlers`);
-	wsHandlers.forEach(handler => {
-		if (!handler.disabled) {
-			managers.set(handler, new ConnectionManager(logger));
-		}
-	});
-	return async (request: IncomingMessage, socket: Socket, _: Buffer) => {
-		logger.debug(`handlingApiWsRequest: new http upgraded event`);
-		const url = Utils.request.buildFullUrl(request, options.config);
-		const pathname = url.pathname;
-		const endpointNoPrefix = Utils.request.removeEndpointPrefix(pathname, endpointPrefix);
-		let handler: typeof wsHandlers[number] | null = null;
-		for (const handle of wsHandlers) {
-			const handlerMatched = matcher.doMatch(
-				Utils.request.addSlash(handle.pattern, "leading"),
-				Utils.request.addSlash(endpointNoPrefix, "leading"),
-				true,
-				null
-			);
-			if (handlerMatched) {
-				if (handle.disabled) {
-					logger.debug("handlingApiWsRequest: Request handler is disabled");
-				} else {
-					handler = handle;
-					break;
-				}
-			}
-		}
-		if (handler !== null) {
-			logger.debug("handlingApiWsRequest: Request handler matched");
-			const clientKey = request.headers["sec-websocket-key"];
-			if (!clientKey) {
-				socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
-				socket.destroy();
-				return;
-			}
-			if (handler.authenticate) {
-				try {
-					const authenticated = await handler.authenticate(request);
-					if (!authenticated) {
-						socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-						socket.destroy();
-						return;
-					}
-				} catch (err: any) {
-					logger.debug("handlingApiWsRequest: Request handler authentication error: ", err);
-					socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
-					socket.destroy();
-					return;
-				}
-			}
-			let connection;
-			try {
-				const {headers, deflateOptions, subprotocol} = Utils.ws.handshake(request, clientKey, logger, handler.perMessageDeflate, handler.subprotocols);
-				socket.write(headers);
-				connection = new WebSocketConnection(
-					logger,
-					socket,
-					pathname,
-					managers.get(handler)!,
-					deflateOptions,
-					handler.perMessageDeflate,
-					subprotocol
-				);
-			} catch (error: any) {
-				if (error.message === Constants.WEB_SOCKET.PER_MESSAGE_DEFLATE_STRICT_ERROR) {
-					logger.error(`handlingApiWsRequest: ERROR - plugin have strict perMessageDeflate options and client sent different options`);
-					return;
-				} else {
-					throw error;
-				}
-			}
-			const parser = new WebSocketFrameParser();
-			logger.debug(`handlingApiWsRequest: connection established ${connection.id} on ${pathname}`);
-
-			if (handler.defaultRoom) {
-				logger.debug(`handlingApiWsRequest: join to default room ${handler.defaultRoom}`);
-				connection.joinRoom(handler.defaultRoom);
-			}
-
-			if (handler.heartbeat && handler.heartbeat > 0) {
-				logger.debug(`handlingApiWsRequest: heartbeat enabled`);
-				connection.startHeartbeat(handler.heartbeat);
-			}
-
-			if (handler.inactivityTimeout && handler.inactivityTimeout > 0) {
-				logger.debug(`handlingApiWsRequest: inactivity timeout enabled`);
-				connection.startInactivityTimeout(handler.inactivityTimeout);
-			}
-
-			if (handler.onConnect) {
-				try {
-					await handler.onConnect(connection, request);
-				} catch (error: any) {
-					logger.debug(`handlingApiWsRequest: error in connect handler - `, error);
-					if (handler.onError) {
-						await handler.onError(connection, error);
-					} else {
-						logger.error("handlingApiWsRequest: error in connect handler - ", error);
-						await connection.send({
-							type: "error",
-							message: (error as Error).message
-						});
-					}
-					if (!connection.closed) {
-						connection.close(1011, "Internal error", false);
-					}
-				}
-			}
-
-			const onDataSocket = async (data: Buffer) => {
-				if (handler.inactivityTimeout && handler.inactivityTimeout > 0) {
-					connection.resetInactivityTimer(handler.inactivityTimeout);
-				}
-				let frames: WebSocketFrame[] = [];
-				try {
-					frames = parser.parse(data);
-				} catch (error: any) {
-					logger.debug(`handlingApiWsRequest: error parsing frame - `, error);
-					if (handler.onError) {
-						await handler.onError(connection, error);
-					} else {
-						logger.error(`handlingApiWsRequest: error parsing frame - `, error);
-						await connection.send({
-							type: "error",
-							message: (error as Error).message
-						});
-					}
-					if (!connection.closed) {
-						const code = 1002;
-						const reason = "Protocol error";
-						if (handler.onClose) {
-							await handler.onClose(connection, code, reason, false);
-						}
-						!connection.closed && await connection.close(code, reason, false);
-					}
-				}
-
-				for (const frame of frames) {
-					await processFrame(frame, connection, handler, logger);
-				}
-			}
-
-			const onCloseSocket = async (hadError: boolean) => {
-				logger.debug(`handlingApiWsRequest: Socket closed for ${connection.id}${hadError ? ' with error' : ''}`);
-				if (!connection.closed) {
-					if (handler.onClose) {
-						await handler.onClose(connection, hadError ? 1006 : 1000, hadError ? 'Connection closed abnormally' : "", false);
-					}
-					!connection.closed && await connection.close(hadError ? 1006 : 1000, hadError ? 'Connection closed abnormally' : "", false);
-				}
-			}
-
-			const onErrorSocket = async (error: any) => {
-				logger.error(`handlingApiWsRequest: Socket error for ${connection.id}: `, error);
-				if (handler.onError) {
-					await handler.onError(connection, error);
-				}
-				if (!connection.closed) {
-					connection.forceClose();
-				}
-			}
-
-			socket.on('data', onDataSocket);
-
-			socket.on('close', onCloseSocket);
-
-			socket.on('error', onErrorSocket);
-
-			connection.cleanup = () => {
-				socket.removeListener('data', onDataSocket);
-				socket.removeListener('close', onCloseSocket);
-				socket.removeListener('error', onErrorSocket);
-			}
-		} else {
-			socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
-			socket.destroy();
-		}
-		logger.debug(`handlingApiWsRequest: http upgraded event terminated`);
-	}
-}
-
 export const runPlugin = async (req: IncomingMessage, response: ServerResponse, next: Connect.NextFunction, logger: ILogger, options: UniversalApiOptionsRequired) => {
 	logger.debug(`runPlugin: START`);
 	try {
@@ -1160,11 +669,308 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 	logger.debug(`runWsPlugin: START`);
 	const { enableWs, wsHandlers } = options;
 	const httpServer = server.httpServer;
-	if (!httpServer || !enableWs || httpServer && enableWs && wsHandlers.length === 0) {
-		logger.debug(`runWsPlugin disabled${!httpServer ? ": no server http found" : enableWs ? ": no handler found" : ""}`);
+	if (!httpServer || !enableWs || wsHandlers.length === 0) {
+		logger.debug(`runWsPlugin disabled${!httpServer ? ": no http server found" : enableWs ? ": no handlers found" : ""}`);
+		return undefined;
+	}
+
+	const managers = new Map<UniversalApiWsHandler, ConnectionManager>();
+	const handlerWssMap = new Map<UniversalApiWsHandler, WebSocketServer>();
+
+	wsHandlers.forEach(handler => {
+		if (!handler.disabled) {
+			managers.set(handler, new ConnectionManager(logger));
+			if (handler.perMessageDeflate !== undefined || handler.subprotocols?.length) {
+				handlerWssMap.set(handler, new WebSocketServer({
+					noServer: true,
+					...(
+						handler.perMessageDeflate !== undefined
+							? { perMessageDeflate: handler.perMessageDeflate }
+							: {}
+					),
+					...(
+						handler.subprotocols?.length
+							? {
+								handleProtocols: (protocols) => {
+									for (const p of protocols) {
+										if (handler.subprotocols!.includes(p)) {
+											return p;
+										}
+									}
+									return false;
+								}
+							}
+							: {}
+					)
+				}));
+			}
+		}
+	});
+
+	const wss = new WebSocketServer({ noServer: true });
+
+	const upgradeHandler = async (req: IncomingMessage, socket: Socket, head: NonSharedBuffer) => {
+		logger.debug(`runWsPlugin: new upgrade event`);
+		const url = Utils.request.buildFullUrl(req, options.config);
+		const endpointNoPrefix = Utils.request.removeEndpointPrefix(url.pathname, options.endpointPrefix);
+
+		let handler: typeof wsHandlers[number] | null = null;
+		for (const handle of wsHandlers) {
+			const matched = options.matcher.doMatch(
+				Utils.request.addSlash(handle.pattern, "leading"),
+				Utils.request.addSlash(endpointNoPrefix, "leading"),
+				true,
+				null
+			);
+			if (matched) {
+				if (handle.disabled) {
+					logger.debug("runWsPlugin: matched handler is disabled");
+				} else {
+					handler = handle;
+					break;
+				}
+			}
+		}
+
+		if (handler === null) {
+			logger.debug(`runWsPlugin: no handler for ${url.pathname}`);
+			socket.end("HTTP/1.1 404 Not Found\r\n\r\n");
 		return;
 	}
-	const callback = handlingApiWsRequest(logger, options);
-	httpServer.on("upgrade", callback);
+
+		const currentHandler = handler;
+
+		if (currentHandler.authenticate) {
+			try {
+				const allowed = await currentHandler.authenticate(req);
+				if (!allowed) {
+					logger.debug(`runWsPlugin: authenticate rejected ${url.pathname}`);
+					socket.end("HTTP/1.1 401 Unauthorized\r\n\r\n");
+					return;
+				}
+			} catch (err: any) {
+				logger.error(`runWsPlugin: authenticate threw for ${url.pathname} - `, err.message);
+				socket.end("HTTP/1.1 500 Internal Server Error\r\n\r\n");
+				return;
+			}
+		}
+
+		const manager = managers.get(currentHandler)!;
+
+		const handlerWss = handlerWssMap.get(currentHandler) ?? wss;
+
+		handlerWss.handleUpgrade(req, socket as any, head, async (ws) => {
+			logger.debug(`runWsPlugin: connection upgraded for ${url.pathname}`);
+			const connection = new WebSocketConnection(
+				logger,
+				ws,
+				url.pathname,
+				manager,
+				ws.protocol || undefined
+			);
+
+			if (currentHandler.defaultRoom) {
+				logger.debug(`runWsPlugin: joining default room ${currentHandler.defaultRoom}`);
+				connection.joinRoom(currentHandler.defaultRoom);
+			}
+
+			if (currentHandler.heartbeat && currentHandler.heartbeat > 0) {
+				logger.debug(`runWsPlugin: heartbeat enabled`);
+				connection.startHeartbeat(currentHandler.heartbeat);
+			}
+
+			if (currentHandler.inactivityTimeout && currentHandler.inactivityTimeout > 0) {
+				logger.debug(`runWsPlugin: inactivity timeout enabled`);
+				connection.startInactivityTimeout(currentHandler.inactivityTimeout);
+			}
+
+			ws.on("pong", async (data: Buffer) => {
+				connection.resetMissedPong();
+				if (currentHandler.onPong) {
+					try {
+						await currentHandler.onPong(connection, data);
+					} catch (err: any) {
+						logger.debug(`runWsPlugin: error in onPong handler - `, err);
+						if (currentHandler.onError) {
+							await currentHandler.onError(connection, err);
+						} else {
+							await connection.send({ type: "error", message: (err as Error).message });
+						}
+					}
+				}
+			});
+
+			ws.on("ping", async (data: Buffer) => {
+				connection.resetMissedPong();
+				if (currentHandler.onPing) {
+					try {
+						await currentHandler.onPing(connection, data);
+					} catch (err: any) {
+						logger.debug(`runWsPlugin: error in onPing handler - `, err);
+						if (currentHandler.onError) {
+							await currentHandler.onError(connection, err);
+						} else {
+							await connection.send({ type: "error", message: (err as Error).message });
+						}
+					}
+				} else {
+					connection.pong(data);
+				}
+			});
+
+			ws.on("message", async (rawData: Buffer | ArrayBuffer | Buffer[], isBinary: boolean) => {
+				if (currentHandler.inactivityTimeout && currentHandler.inactivityTimeout > 0) {
+					connection.resetInactivityTimer(currentHandler.inactivityTimeout);
+				}
+
+				let message: any;
+				let dataBuffer: Buffer;
+				if (Buffer.isBuffer(rawData)) {
+					dataBuffer = rawData;
+				} else if (Array.isArray(rawData)) {
+					dataBuffer = Buffer.concat(rawData);
+				} else {
+					dataBuffer = Buffer.from(rawData);
+				}
+
+				if (currentHandler.transformRawData) {
+					try {
+						message = await currentHandler.transformRawData(dataBuffer);
+					} catch (err: any) {
+						logger.debug(`runWsPlugin: error in transformRawData - `, err);
+						if (currentHandler.onError) {
+							await currentHandler.onError(connection, err);
+						} else {
+							await connection.send({ type: "error", message: (err as Error).message });
+						}
+						return;
+					}
+				} else if (isBinary) {
+					message = dataBuffer;
+				} else {
+					const text = dataBuffer.toString("utf8");
+					try {
+						message = JSON.parse(text);
+					} catch {
+						message = text;
+					}
+				}
+
+				if (currentHandler.delay && currentHandler.delay > 0) {
+					await new Promise(res => setTimeout(res, currentHandler.delay));
+				}
+
+				let matched = false;
+				if (currentHandler.responses && currentHandler.responses.length > 0) {
+					for (const resp of currentHandler.responses) {
+						try {
+							if (resp.match(connection, message)) {
+								matched = true;
+								try {
+									let responseData = resp.response;
+									if (typeof responseData === "function") {
+										responseData = await responseData(connection, message);
+									}
+									if (resp.broadcast) {
+										if (typeof resp.broadcast === "boolean") {
+											connection.broadcastAllRooms(responseData, false);
+										} else {
+											connection.broadcast(responseData, {
+												room: resp.broadcast.room,
+												includeSelf: resp.broadcast.includeSelf ?? false,
+											});
+										}
+									} else {
+										await connection.send(responseData);
+									}
+								} catch (err: any) {
+									logger.debug(`runWsPlugin: error in response handler - `, err);
+									if (currentHandler.onError) {
+										await currentHandler.onError(connection, err);
+									} else {
+										await connection.send({ type: "error", message: (err as Error).message });
+									}
+								}
+								break;
+							}
+						} catch (err: any) {
+							matched = true;
+							logger.debug(`runWsPlugin: error matching response pattern - `, err);
+							if (currentHandler.onError) {
+								await currentHandler.onError(connection, err);
+							} else {
+								await connection.send({ type: "error", message: (err as Error).message });
+							}
+							break;
+						}
+					}
+				}
+
+				if (!matched && currentHandler.onMessage) {
+					try {
+						await currentHandler.onMessage(connection, message);
+					} catch (err: any) {
+						logger.debug(`runWsPlugin: error in onMessage handler - `, err);
+						if (currentHandler.onError) {
+							await currentHandler.onError(connection, err);
+						} else {
+							await connection.send({ type: "error", message: (err as Error).message });
+						}
+					}
+				}
+			});
+
+			ws.on("close", async (code: number, reason: Buffer) => {
+				if (!connection.closed) {
+					connection.markClosed();
+					if (currentHandler.onClose) {
+						await currentHandler.onClose(connection, code, reason.toString() || "", true);
+					}
+					manager.remove(connection.id);
+				}
+			});
+
+			ws.on("error", async (err: Error) => {
+				logger.debug(`runWsPlugin: socket error for ${connection.id}: `, err.message);
+				if (currentHandler.onError) {
+					await currentHandler.onError(connection, err);
+				} else {
+					logger.error(`runWsPlugin: socket error for ${connection.id}: `, err.message);
+				}
+				if (!connection.closed) {
+					connection.forceClose();
+				}
+			});
+
+			if (currentHandler.onConnect) {
+				try {
+					await currentHandler.onConnect(connection, req);
+				} catch (err: any) {
+					logger.debug(`runWsPlugin: error in onConnect handler - `, err);
+					if (currentHandler.onError) {
+						await currentHandler.onError(connection, err);
+					} else {
+						await connection.send({ type: "error", message: (err as Error).message });
+					}
+					if (!connection.closed) {
+						connection.close(1011, "Internal error");
+					}
+				}
+			}
+			logger.debug(`runWsPlugin: connection ${connection.id} fully set up`);
+		});
+	};
+
+	httpServer.on("upgrade", upgradeHandler);
+
 	logger.debug(`runWsPlugin: END`);
+
+	return () => {
+		httpServer.off("upgrade", upgradeHandler);
+		wss.close();
+		handlerWssMap.forEach(s => s.close());
+		managers.forEach(manager => {
+			manager.getAll().forEach(conn => conn.forceClose());
+		});
+	};
 }

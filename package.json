@@ -23,7 +23,7 @@
 	"scripts": {
 		"dev": "unbuild --stub",
 		"test": "vitest",
-		"test:coverage": "vitest --coverage",
+		"test:coverage": "vitest run --coverage",
 		"test:run": "vitest run",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
@@ -49,7 +49,8 @@
 	"devDependencies": {
 		"@eslint/eslintrc": "^3.3.5",
 		"@eslint/js": "^10.0.1",
-		"@types/node": "^25.5.0",
+		"@types/node": "^22.19.17",
+		"@types/ws": "^8.18.1",
 		"@vitest/coverage-v8": "4.0.18",
 		"eslint": "^10.1.0",
 		"globals": "^17.4.0",
@@ -58,7 +59,8 @@
 		"typescript-eslint": "^8.57.2",
 		"unbuild": "^3.6.1",
 		"vitepress": "^1.6.4",
-		"vitest": "^4.1.2"
+		"vitest": "^4.1.2",
+		"ws": "^8.20.0"
 	},
 	"peerDependencies": {
 		"vite": "^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || >=8.0.0"
