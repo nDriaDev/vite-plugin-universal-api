@@ -19,7 +19,7 @@ export class UniversalApiError extends Error implements IUniversalApiError {
 		}
 		this.type = type;
 		this.path = path;
-		!!code && (this.code = code);
+		code !== undefined && code !== null && (this.code = code);
 		!!extra && (this.extra = extra);
     }
 

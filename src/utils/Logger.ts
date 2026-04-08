@@ -32,7 +32,7 @@ export class Logger implements ILogger {
 		["debug", "info", "warn"].includes(this.logLevel) && this.log(msg, this.colors.green);
 	}
 	warn(...msg: string[]): void {
-		["info", "warn"].includes(this.logLevel) && this.log(msg, this.colors.yellow);
+		["debug", "info", "warn"].includes(this.logLevel) && this.log(msg, this.colors.yellow);
 	}
 	error(...msg: string[]): void {
 		this.log(msg, this.colors.red);

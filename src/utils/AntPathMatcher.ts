@@ -353,7 +353,7 @@ export class AntPathMatcher {
     static WHITESPACE_$LI$() {
         if (AntPathMatcher.WHITESPACE == null) {
             // eslint-disable-next-line no-control-regex
-            AntPathMatcher.WHITESPACE = new RegExp("[\\t-\\r \\u1680\\u180E\\u2000-\\u2006\\u2008-\\u200A\\u2028\\u2029\\u205F\\u3000\\uFEFF]|[\\x1C-\\x1F]", "g");
+            AntPathMatcher.WHITESPACE = new RegExp("[\\t-\\r \\u1680\\u180E\\u2000-\\u2006\\u2008-\\u200A\\u2028\\u2029\\u205F\\u3000\\uFEFF]|[\\x1C-\\x1F]");
         }
         return AntPathMatcher.WHITESPACE;
     };
