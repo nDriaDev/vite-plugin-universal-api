@@ -685,21 +685,21 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 					noServer: true,
 					...(
 						handler.perMessageDeflate !== undefined
-							? { perMessageDeflate: handler.perMessageDeflate }
+						? { perMessageDeflate: handler.perMessageDeflate }
 							: {}
 					),
 					...(
 						handler.subprotocols?.length
-							? {
-								handleProtocols: (protocols) => {
-									for (const p of protocols) {
+						? {
+							handleProtocols: (protocols) => {
+								for (const p of protocols) {
 										if (handler.subprotocols!.includes(p)) {
 											return p;
 										}
-									}
-									return false;
 								}
+								return false;
 							}
+						}
 							: {}
 					)
 				}));

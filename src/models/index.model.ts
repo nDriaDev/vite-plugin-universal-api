@@ -27,21 +27,33 @@ import { AntPathMatcher } from "../utils/AntPathMatcher";
  */
 export interface UniversalApiRequest<TBody = unknown> extends IncomingMessage {
 	/**
-	 * Parsed request body.
+	 * Parsed request body, or `null` when no body was sent.
+	 *
 	 * The type is determined by the generic parameter `TBody` (defaults to `unknown`).
 	 * Specify the type explicitly to get full type safety: `UniversalApiRequest<MyDto>`.
 	 *
-	 * @example
-	 * // Typed body: compiler enforces correctness
-	 * const req: UniversalApiRequest<{ username: string; age: number }>;
-	 * req.body.username; // string ✓
+	 * `body` is `null` in the following situations:
+	 * - The request carries no body (e.g. `GET`, `HEAD`, `DELETE`).
+	 * - The request has a body but the built-in parser received no data chunks
+	 *   (empty payload or unsupported `Content-Type`).
+	 * - The parser is disabled (`parser: false`) — `body` stays `null` as set
+	 *   by the request initialisation step.
+	 *
+	 * Always guard against `null` before accessing body properties:
 	 *
 	 * @example
-	 * // Untyped: body must be narrowed before use
+	 * // Typed body with null guard
+	 * const req: UniversalApiRequest<{ username: string; age: number }>;
+	 * if (req.body !== null) {
+	 *   req.body.username; // string ✓
+	 * }
+	 *
+	 * @example
+	 * // Untyped: narrow before use
 	 * const req: UniversalApiRequest; // TBody = unknown
-	 * if (typeof req.body === 'object' && req.body !== null) { ... }
+	 * if (req.body !== null && typeof req.body === 'object') { ... }
 	 */
-	body: TBody;
+	body: TBody | null;
 
 	/**
 	 * Route parameters extracted from the URL pattern.

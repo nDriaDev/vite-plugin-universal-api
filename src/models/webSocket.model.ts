@@ -165,7 +165,7 @@ export interface IWebSocketConnection {
 	 * @param data - The data to broadcast
 	 * @param includeSelf - Whether to include the current connection
 	 */
-	broadcastAllRooms(data: any, includeSelf: boolean): void;
+	broadcastAllRooms(data: any, includeSelf?: boolean): void;
 
 	/**
 	 * Send a ping frame to the client.
