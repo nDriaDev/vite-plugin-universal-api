@@ -1,17 +1,17 @@
 import { PreviewServer, ResolvedConfig, ViteDevServer } from "vite";
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { UniversalApiOptions, UniversalApiRequest } from "./models/index.model";
 import path from "node:path";
 import { mkdirp } from 'mkdirp';
 import * as fs from 'node:fs';
 import { rimraf } from 'rimraf';
-import { Constants } from "./utils/constants";
+import { Constants } from "../utils/constants";
 import { PassThrough } from "node:stream";
-import { UniversalApiError } from "./utils/Error";
-import { Utils } from "./utils/utils";
+import { UniversalApiError } from "../utils/Error";
+import { Utils } from "../utils/utils";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { randomBytes } from "node:crypto";
 import { URLSearchParams } from "node:url";
+import { UniversalApiOptions, UniversalApiRequest } from "../models/plugin.model";
 
 const ENDPOINT_PREFIX = "/api";
 const MOCK_DIR = {
@@ -98,8 +98,8 @@ const mocks = vi.hoisted(() => ({
 		}
 	}
 }));
-vi.mock('./utils/utils', async (importOriginal) => {
-	const mod = await importOriginal<typeof import('./utils/utils')>();
+vi.mock('../utils/utils', async (importOriginal) => {
+	const mod = await importOriginal<typeof import('../utils/utils')>();
 	const requestsContext = mod.Utils.request;
 	const responseContext = mod.Utils.response;
 	const fileContext = mod.Utils.files;
@@ -296,8 +296,8 @@ const getServer = () => ({
 	httpServer: vi.mockObject({once: vi.fn()})
 }) as any;
 const generateOptions = (opt?: UniversalApiOptions) => (
-	import('./index')
-		.then(module => module.default(opt) as unknown as {
+	import('../index')
+		.then(module => module.universalApiPlugin(opt) as unknown as {
 			configResolved: (conf: ResolvedConfig) => Promise<void>,
 			configureServer: (server: ViteDevServer) => void,
 			configurePreviewServer: (server: PreviewServer) => void
@@ -1987,6 +1987,58 @@ describe('TEST CONFIGURE_SERVER', () => {
 		expect(next).not.toHaveBeenCalled();
 	});
 
+	it('UNAUTHORIZED_AUTHENTICATE_FALSE', async () => {
+		mockOptions.handlers = [
+			{
+				handle: "FS",
+				method: "GET",
+				pattern: "/product",
+				authenticate(request) {
+					return false;
+				},
+				postHandle(req, res, data) {
+					res.statusCode = 200;
+					res.write(data);
+					res.end();
+				},
+			}
+		];
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		req.url = "/api/product";
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(res.statusCode).toBe(401);
+		expect(jsonResponse.message).toBe("Unauthorized");
+	});
+
+	it('UNAUTHORIZED_AUTHENTICATE_THROWS_ERROR', async () => {
+		mockOptions.handlers = [
+			{
+				handle: "FS",
+				method: "GET",
+				pattern: "/product",
+				authenticate(request) {
+					throw Error("generic")
+				},
+				postHandle(req, res, data) {
+					res.statusCode = 200;
+					res.write(data);
+					res.end();
+				},
+			}
+		];
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		req.url = "/api/product";
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(res.statusCode).toBe(500);
+		expect(jsonResponse.message).toBe("generic");
+	});
+
 	it('UNRECOGNIZED_ERROR', async () => {
 		mocks.utils.request.removeSlash.shouldFail = true;
 		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
@@ -2006,10 +2058,14 @@ describe('TEST CONFIGURE_SERVER', () => {
 			{
 				handle: "FS",
 				method: "GET",
+				authenticate(request) {
+					return request.headers["authorization"] === "test"
+				},
 				pattern: "/users"
 			}
 		];
 		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		req.headers["authorization"] = "test"
 		req.end();
 		const middleware = await execute(true);
 		await middleware(req, res, next);
@@ -2026,6 +2082,7 @@ describe('TEST CONFIGURE_SERVER', () => {
 				handle: "FS",
 				method: "GET",
 				pattern: "/product",
+				authenticate: "test",
 				preHandle: {
 					transform: [
 						{
@@ -2038,6 +2095,7 @@ describe('TEST CONFIGURE_SERVER', () => {
 		];
 		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
 		req.url = "/api/product";
+		req.headers["test"] = "test"
 		req.end();
 		const middleware = await execute(true);
 		await middleware(req, res, next);
@@ -2054,6 +2112,7 @@ describe('TEST CONFIGURE_SERVER', () => {
 				handle: "FS",
 				method: "GET",
 				pattern: "/product",
+				authenticate: true,
 				preHandle: {
 					transform: (pathname) => {
 						return "/api/users";
@@ -2063,6 +2122,7 @@ describe('TEST CONFIGURE_SERVER', () => {
 		];
 		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
 		req.url = "/api/product";
+		req.headers["authorization"] = "test"
 		req.end();
 		const middleware = await execute(true);
 		await middleware(req, res, next);
@@ -4209,7 +4269,7 @@ describe('TEST CONFIGURE_SERVER', () => {
 });
 
 describe('TEST WEBSOCKET', async () => {
-	const { ConnectionManager, WebSocketConnection } = await import('./utils/WebSocket');
+	const { ConnectionManager, WebSocketConnection } = await import('../utils/WebSocket');
 
 	const makeLogger = () => ({
 		debug: vi.fn(),
@@ -4530,7 +4590,7 @@ describe('TEST WEBSOCKET', async () => {
 		});
 
 		it('PONG_METHOD_NOT_SEND_FRAME_IF_THE_CONNECTION_IS_CLOSE', async () => {
-			const { WebSocketConnection, ConnectionManager } = await import('./utils/WebSocket');
+			const { WebSocketConnection, ConnectionManager } = await import('../utils/WebSocket');
 			const logger = makeLogger();
 			const manager = new ConnectionManager(logger);
 			const mockWs = await makeMockWs();
@@ -4546,7 +4606,7 @@ describe('TEST WEBSOCKET', async () => {
 		});
 
 		it('PING_METHOD:_DOESN\'T_SEND_FRAME_IF_THE_CONNECTION_IS_CLOSED', async () => {
-			const { WebSocketConnection, ConnectionManager } = await import('./utils/WebSocket');
+			const { WebSocketConnection, ConnectionManager } = await import('../utils/WebSocket');
 			const logger = makeLogger();
 			const manager = new ConnectionManager(logger);
 			const mockWs = await makeMockWs();
@@ -4563,7 +4623,7 @@ describe('TEST WEBSOCKET', async () => {
 		});
 
 		it('FORCECLOSE_METHOD:_NO-OP_IF_THE_CONNECTION_IS_CLOSED', async () => {
-			const { WebSocketConnection, ConnectionManager } = await import('./utils/WebSocket');
+			const { WebSocketConnection, ConnectionManager } = await import('../utils/WebSocket');
 			const mockWs = await makeMockWs();
 			const manager = new ConnectionManager(makeLogger());
 			const connection = new WebSocketConnection(makeLogger(), mockWs, '/ws', manager);
@@ -4593,7 +4653,7 @@ describe('TEST WEBSOCKET', async () => {
 			const ws = await makeMockWs();
 			ws.protocol = wsOptions.protocol ?? '';
 
-			const { WebSocketServer } = await import('./utils/WebSocket');
+			const { WebSocketServer } = await import('../utils/WebSocket');
 			let resolve:() => void;
 			const upgradeFinished = new Promise<void>((res) => { resolve = res });
 			vi.spyOn(WebSocketServer.prototype, 'handleUpgrade').mockImplementation(async (_req: any, _socket: any, _head: any, cb: any) => {
@@ -4788,7 +4848,7 @@ describe('TEST WEBSOCKET', async () => {
 		it('BROADCAST_IF_RESPONSE_HAS_BROADCAST_TRUE', async () => {
 			const onMessage2 = vi.fn();
 
-			const { WebSocketServer } = await import('./utils/WebSocket');
+			const { WebSocketServer } = await import('../utils/WebSocket');
 			let upgradeCallCount = 0;
 			const wsMocks = [await makeMockWs(), await makeMockWs()];
 			vi.spyOn(WebSocketServer.prototype, 'handleUpgrade').mockImplementation(
@@ -5049,7 +5109,7 @@ describe('TEST WEBSOCKET', async () => {
 			const responsePayload = { msg: 'hello room' };
 			const roomName = 'secret-room';
 
-			const { WebSocketConnection } = await import('./utils/WebSocket');
+			const { WebSocketConnection } = await import('../utils/WebSocket');
 			const broadcastSpy = vi.spyOn(WebSocketConnection.prototype, 'broadcast').mockImplementation(() => { });
 
 			await setupWsPlugin({ ...mockOptions }, [
@@ -5139,7 +5199,7 @@ describe('TEST WEBSOCKET', async () => {
 		it('RESET_INACTIVITY_TIMER_ON_EVERY_RECEIVED_MESSAGE', async () => {
 			const timeoutValue = 5000;
 
-			const { WebSocketConnection } = await import('./utils/WebSocket');
+			const { WebSocketConnection } = await import('../utils/WebSocket');
 
 			const resetSpy = vi.spyOn(WebSocketConnection.prototype, 'resetInactivityTimer');
 
@@ -5209,7 +5269,7 @@ describe('TEST WEBSOCKET', async () => {
 		});
 
 		it('RESET_MISSED_PONG_WHEN_RECEIVES_PING_AND_PONG_FROM_CLIENT', async () => {
-			const { WebSocketConnection } = await import('./utils/WebSocket');
+			const { WebSocketConnection } = await import('../utils/WebSocket');
 
 			const resetMissedPongSpy = vi.spyOn(WebSocketConnection.prototype, 'resetMissedPong').mockImplementation(() => { });
 
@@ -5233,7 +5293,7 @@ describe('TEST WEBSOCKET', async () => {
 
 		it('ENABLE_HEARTBEAT_IF_PROVIDED_WITH_POSITIVE_VALUE', async () => {
 			const heartbeatMs = 30000;
-			const { WebSocketConnection } = await import('./utils/WebSocket');
+			const { WebSocketConnection } = await import('../utils/WebSocket');
 
 			const startHeartbeatSpy = vi.spyOn(WebSocketConnection.prototype, 'startHeartbeat').mockImplementation(() => { });
 
@@ -5251,7 +5311,7 @@ describe('TEST WEBSOCKET', async () => {
 		});
 
 		it('DISABLE_HEARTBEAT_IF_VALUE_IS_0_OR_NOT_PROVIDED', async () => {
-			const { WebSocketConnection } = await import('./utils/WebSocket');
+			const { WebSocketConnection } = await import('../utils/WebSocket');
 			const startHeartbeatSpy = vi.spyOn(WebSocketConnection.prototype, 'startHeartbeat').mockImplementation(() => { });
 
 			await setupWsPlugin({ ...mockOptions }, [
@@ -5267,7 +5327,7 @@ describe('TEST WEBSOCKET', async () => {
 		});
 
 		it('CLEANUP_FUNCTION_EXECUTES_UNMOUNT', async () => {
-			const { WebSocketServer, WebSocketConnection } = await import('./utils/WebSocket');
+			const { WebSocketServer, WebSocketConnection } = await import('../utils/WebSocket');
 			const wssCloseSpy = vi.spyOn(WebSocketServer.prototype, 'close').mockImplementation(() => { });
 			const forceCloseSpy = vi.spyOn(WebSocketConnection.prototype, 'forceClose').mockImplementation(() => { });
 
@@ -5297,7 +5357,7 @@ describe('TEST WEBSOCKET', async () => {
 		});
 
 		it('HANDLEPROTOCOLS_SELECT_CORRECT_PROTOCOL', async () => {
-			const WebSocketModule = await import('./utils/WebSocket');
+			const WebSocketModule = await import('../utils/WebSocket');
 			let capturedOptions: any = null;
 			const wsServerSpy = vi.spyOn(WebSocketModule, 'WebSocketServer').mockImplementation(function (opts: any) {
 				if (opts && opts.handleProtocols) {
@@ -5373,7 +5433,7 @@ describe('TEST WEBSOCKET', async () => {
 		});
 
 		it('CLOSE_AND_ERROR_BLOCKS', async () => {
-			const { WebSocketConnection, ConnectionManager } = await import('./utils/WebSocket');
+			const { WebSocketConnection, ConnectionManager } = await import('../utils/WebSocket');
 			const markClosedSpy = vi.spyOn(WebSocketConnection.prototype, 'markClosed');
 			const removeSpy = vi.spyOn(ConnectionManager.prototype, 'remove');
 
@@ -5400,7 +5460,7 @@ describe('TEST WEBSOCKET', async () => {
 		});
 
 		it('ONCLOSE_BLOCK_AND_REASON_EMPTY_HANDLING', async () => {
-			const { WebSocketConnection, ConnectionManager } = await import('./utils/WebSocket');
+			const { WebSocketConnection, ConnectionManager } = await import('../utils/WebSocket');
 			const removeSpy = vi.spyOn(ConnectionManager.prototype, 'remove');
 
 			const onClose = vi.fn();
@@ -5425,7 +5485,7 @@ describe('TEST WEBSOCKET', async () => {
 		});
 
 		it('SEND_METHOD_HANDLING_STRINGS_OBJECTS_AND_ERRORS', async () => {
-			const { WebSocketConnection, ConnectionManager } = await import('./utils/WebSocket');
+			const { WebSocketConnection, ConnectionManager } = await import('../utils/WebSocket');
 			const logger = makeLogger();
 			const manager = new ConnectionManager(logger);
 			const mockWs = await makeMockWs();
@@ -5446,7 +5506,7 @@ describe('TEST WEBSOCKET', async () => {
 
 		it('PONG_EVENT_RESET_MISSED_PONG_AND_CALL_ONPONG', async () => {
 			const onPong = vi.fn();
-			const { WebSocketConnection } = await import('./utils/WebSocket');
+			const { WebSocketConnection } = await import('../utils/WebSocket');
 			const resetSpy = vi.spyOn(WebSocketConnection.prototype, 'resetMissedPong');
 
 			await setupWsPlugin({ ...mockOptions }, [
@@ -5501,7 +5561,7 @@ describe('TEST WEBSOCKET', async () => {
 		});
 
 		it('ERROR_WITHOUT_ON_ERROR', async () => {
-			const { Logger } = await import('./utils/Logger');
+			const { Logger } = await import('../utils/Logger');
 			const loggerErrorSpy = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => { });
 			const testError = new Error('forced-error-for-else');
 
