@@ -1,5 +1,27 @@
 ### [1.0.4](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v1.0.4) - 2026-02-09
 
+## [2.1.0](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v2.1.0) - 2026-04-10
+
+### Features
+
+- add authenticate option to rest handlers ([3926356](https://github.com/nDriaDev/vite-plugin-universal-api/commit/3926356))
+
+### Code Refactoring
+
+- unused import ([edc303a](https://github.com/nDriaDev/vite-plugin-universal-api/commit/edc303a))
+
+### Documentation
+
+- update documentation for authenticate option ([8fc8b66](https://github.com/nDriaDev/vite-plugin-universal-api/commit/8fc8b66))
+
+### Chores
+
+- reindent release script ([68503ed](https://github.com/nDriaDev/vite-plugin-universal-api/commit/68503ed))
+- pass from unbuild to tsdown + update dependencies ([cc2cabf](https://github.com/nDriaDev/vite-plugin-universal-api/commit/cc2cabf))
+- verify build script refactor ([df6c67e](https://github.com/nDriaDev/vite-plugin-universal-api/commit/df6c67e))
+- reorganize entry file ([8105b62](https://github.com/nDriaDev/vite-plugin-universal-api/commit/8105b62))
+- add github workflow security audit + fix release script ([a491c89](https://github.com/nDriaDev/vite-plugin-universal-api/commit/a491c89))
+
 ## [2.0.0](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v2.0.0) - 2026-04-08
 
 ### Features
