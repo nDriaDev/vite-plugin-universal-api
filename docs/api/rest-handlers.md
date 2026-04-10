@@ -18,12 +18,13 @@ A handler that executes custom logic and writes the response manually.
 
 ```typescript
 interface UniversalApiRestFunctionHandler {
-  pattern:   string
-  method:    HttpMethod
-  handle:    UniversalApiSimpleHandler
-  disabled?: boolean
-  delay?:    number
-  parser?:   UniversalApiParser
+  pattern:      string
+  method:       HttpMethod
+  handle:       UniversalApiSimpleHandler
+  disabled?:    boolean
+  delay?:       number
+  parser?:      UniversalApiParser
+  authenticate?: UniversalApiAuthenticate
 }
 ```
 
@@ -35,6 +36,7 @@ interface UniversalApiRestFunctionHandler {
 | `disabled` | `boolean` | — | If `true`, the handler is skipped. Default: `false` |
 | `delay` | `number` | — | Artificial delay in ms before executing the handler. Overrides the global `delay`. |
 | `parser` | `UniversalApiParser` | — | Request parser configuration for this handler. Overrides the global `parser`. |
+| `authenticate` | `UniversalApiAuthenticate` | — | Authentication check run before the handler. `true` requires the `authorization` header; a string requires that specific header; a function is a custom predicate. Default: `false` (no check). |
 
 > **Note:** `pagination` and `filters` are **not** available on function handlers — they only apply to FS handlers. Implement pagination and filtering manually inside your `handle` function if needed.
 
@@ -46,16 +48,17 @@ A handler that delegates request processing to the File-System API, with optiona
 
 ```typescript
 interface UniversalApiRestFsHandler {
-  pattern:     string
-  method:      HttpMethod
-  handle:      'FS'
-  disabled?:   boolean
-  delay?:      number
-  parser?:     UniversalApiParser
-  pagination?: 'none' | { inclusive?: UniversalApiPagination; exclusive?: never } | { inclusive?: never; exclusive?: UniversalApiPagination }
-  filters?:    'none' | { inclusive?: UniversalApiFilter; exclusive?: never } | { inclusive?: never; exclusive?: UniversalApiFilter }
-  preHandle?:  UniversalApiPreHandle
-  postHandle?: UniversalApiPostHandle
+  pattern:      string
+  method:       HttpMethod
+  handle:       'FS'
+  disabled?:    boolean
+  delay?:       number
+  parser?:      UniversalApiParser
+  authenticate?: UniversalApiAuthenticate
+  pagination?:  'none' | { inclusive?: UniversalApiPagination; exclusive?: never } | { inclusive?: never; exclusive?: UniversalApiPagination }
+  filters?:     'none' | { inclusive?: UniversalApiFilter; exclusive?: never } | { inclusive?: never; exclusive?: UniversalApiFilter }
+  preHandle?:   UniversalApiPreHandle
+  postHandle?:  UniversalApiPostHandle
 }
 ```
 
@@ -67,6 +70,7 @@ interface UniversalApiRestFsHandler {
 | `disabled` | `boolean` | — | If `true`, the handler is skipped. Default: `false` |
 | `delay` | `number` | — | Artificial delay in ms. Overrides the global `delay`. |
 | `parser` | `UniversalApiParser` | — | Request parser for this handler. Overrides the global `parser`. |
+| `authenticate` | `UniversalApiAuthenticate` | — | Authentication check run before the handler. `true` requires the `authorization` header; a string requires that specific header; a function is a custom predicate. Default: `false` (no check). |
 | `pagination` | `'none' \| { inclusive?: UniversalApiPagination } \| { exclusive?: UniversalApiPagination }` | — | Pagination config. `'none'` disables the global pagination. `inclusive` merges with the global config; `exclusive` replaces it entirely. Not available when `postHandle` is set. |
 | `filters` | `'none' \| { inclusive?: UniversalApiFilter } \| { exclusive?: UniversalApiFilter }` | — | Filter config. `'none'` disables the global filters. `inclusive` merges with the global config; `exclusive` replaces it entirely. Not available when `postHandle` is set. |
 | `preHandle` | `UniversalApiPreHandle` | — | URL transformation applied before the file lookup. |
@@ -111,6 +115,30 @@ type UniversalApiPostHandle = (
 | `data` | The file content as a UTF-8 string, or `null` if the file was not found on disk. JSON files are returned as their raw JSON string. Non-JSON files (images, text, binary, etc.) are also returned as a UTF-8 string read from disk. For non-`GET` methods, this is the **pre-existing** file content *before* any write or delete would have occurred. |
 
 > ⚠️ When `postHandle` is defined, the plugin does **not** perform any automatic file write, delete, pagination, or filtering. The handler is fully responsible for the response and, if needed, any file I/O.
+
+---
+
+## `UniversalApiAuthenticate`
+
+Authentication option accepted by both REST and WebSocket handlers.
+
+```typescript
+type UniversalApiAuthenticate =
+  | false
+  | true
+  | string
+  | ((request: IncomingMessage) => boolean | Promise<boolean>)
+```
+
+| Value | Behaviour |
+|-------|-----------|
+| `false` | No check — every request is allowed through. **Default.** |
+| `true` | The `authorization` header must be present and non-empty. |
+| `string` | The named header (case-insensitive) must be present and non-empty. |
+| `function` | Custom predicate receiving the `IncomingMessage`. Return `true` to allow, `false` to reject. Supports `async`. |
+
+A rejected request receives **`401 Unauthorized`**.
+If the function throws, the response is **`500 Internal Server Error`**.
 
 ---
 

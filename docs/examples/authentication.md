@@ -32,7 +32,7 @@ export default defineConfig({
       endpointPrefix: '/api',
 
       handlers: [
-        // Login
+        // Login — public, no authentication required
         {
           pattern: '/login',
           method: 'POST',
@@ -55,21 +55,47 @@ export default defineConfig({
           }
         },
 
-        // Protected endpoint
+        // Protected endpoint — shorthand: requires Authorization header to be present
+        {
+          pattern: '/profile',
+          method: 'GET',
+          authenticate: true,   // 401 if Authorization header is missing or empty
+          handle: async (req, res) => {
+            const token = req.headers.authorization!.replace('Bearer ', '')
+            const user = verifyToken(token)
+            res.writeHead(200)
+            res.end(JSON.stringify({ message: 'Profile data', user }))
+          }
+        },
+
+        // Protected endpoint — custom async validation function
         {
           pattern: '/protected',
           method: 'GET',
-          handle: async (req, res) => {
+          authenticate: async (req) => {
             try {
               const token = req.headers.authorization?.replace('Bearer ', '')
-              const user = verifyToken(token)
-
-              res.writeHead(200)
-              res.end(JSON.stringify({ message: 'Protected data', user }))
-            } catch (err) {
-              res.writeHead(401)
-              res.end(JSON.stringify({ error: 'Unauthorized' }))
+              if (!token) return false
+              verifyToken(token)
+              return true
+            } catch {
+              return false
             }
+          },
+          handle: async (req, res) => {
+            res.writeHead(200)
+            res.end(JSON.stringify({ message: 'Protected data' }))
+          }
+        },
+
+        // Protected endpoint — require a custom API-key header
+        {
+          pattern: '/admin/settings',
+          method: 'GET',
+          authenticate: 'x-api-key',   // 401 if x-api-key header is missing or empty
+          handle: async (req, res) => {
+            res.writeHead(200)
+            res.end(JSON.stringify({ settings: {} }))
           }
         }
       ],
@@ -106,4 +132,15 @@ export default defineConfig({
 })
 ```
 
-Full authentication with REST and WebSocket!
+## How `authenticate` works
+
+The `authenticate` option is available on **all** REST and WebSocket handlers. It is evaluated before the handler body runs (or before the WebSocket upgrade completes):
+
+| Value | Behaviour |
+|-------|-----------|
+| `false` | No check — every request passes through. **Default.** |
+| `true` | The `authorization` header must be present and non-empty. |
+| `string` | The named header (e.g. `'x-api-key'`) must be present and non-empty. |
+| `function` | Custom predicate `(req) => boolean \| Promise<boolean>`. Return `true` to allow, `false` to reject. |
+
+A rejected request receives **`401 Unauthorized`**. If the function throws, the response is **`500 Internal Server Error`**.

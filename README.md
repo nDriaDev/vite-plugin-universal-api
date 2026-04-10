@@ -335,6 +335,39 @@ interface RestHandler {
   } | Promise<{...}>;
 
   /**
+   * Authentication check performed before the handler runs.
+   *
+   * - `false`    — No check. Request always passes through. (default)
+   * - `true`     — The `authorization` header must be present and non-empty.
+   * - `string`   — The specified header must be present and non-empty.
+   * - `function` — Custom predicate; receives the request and must return
+   *                `true` to allow or `false` to reject.
+   *                Can be async for token validation, DB lookups, etc.
+   *
+   * A rejected request receives `401 Unauthorized`.
+   * If the function throws, the response is `500 Internal Server Error`.
+   *
+   * @default false
+   *
+   * @example
+   * // Require the Authorization header to be present
+   * authenticate: true
+   *
+   * @example
+   * // Require a custom header (e.g. an API key)
+   * authenticate: 'x-api-key'
+   *
+   * @example
+   * // Custom async validation
+   * authenticate: async (req) => {
+   *   const token = req.headers['authorization']?.replace('Bearer ', '');
+   *   if (!token) return false;
+   *   return await verifyToken(token);
+   * }
+   */
+  authenticate?: false | true | string | ((req: IncomingMessage) => boolean | Promise<boolean>);
+
+  /**
    * Pagination config for this handler (overrides global)
    */
   pagination?: PaginationConfig;
@@ -447,10 +480,42 @@ interface WebSocketHandler {
   disabled?: boolean;
 
   /**
-   * Authentication function executed before WebSocket upgrade
-   * Return true to allow, false to reject with 401
+   * Authentication check executed before the WebSocket handshake completes.
+   *
+   * Accepts the same values as the REST handler `authenticate` option:
+   *
+   * - `false`    — No check. Upgrade always proceeds. (default)
+   * - `true`     — The `authorization` header must be present and non-empty.
+   * - `string`   — The specified header must be present and non-empty.
+   * - `function` — Custom predicate; receives the HTTP upgrade request and must
+   *                return `true` to allow the connection, `false` to reject it
+   *                with `401 Unauthorized`. Can be async.
+   *
+   * If the function throws, the connection is rejected with `500 Internal Server Error`.
+   *
+   * @default false
+   *
+   * @example
+   * // Require the Authorization header
+   * authenticate: true
+   *
+   * @example
+   * // Require a custom header
+   * authenticate: 'x-api-key'
+   *
+   * @example
+   * // Token-based async validation
+   * authenticate: async (req) => {
+   *   const token = req.headers['authorization']?.replace('Bearer ', '');
+   *   if (!token) return false;
+   *   try {
+   *     return (await verifyToken(token)) !== null;
+   *   } catch {
+   *     return false;
+   *   }
+   * }
    */
-  authenticate?: (req: IncomingMessage) => boolean | Promise<boolean>;
+  authenticate?: false | true | string | ((req: IncomingMessage) => boolean | Promise<boolean>);
 
   /**
    * Default room to join on connection
@@ -1828,6 +1893,103 @@ handle: async (req, res) => {
 
 ---
 
+## 🔐 Authentication
+
+The `authenticate` option is available on **both REST and WebSocket handlers**. It is evaluated before the handler runs (or before the WebSocket upgrade completes) and rejects unauthenticated requests automatically.
+
+### Possible Values
+
+| Value | Behaviour |
+|-------|-----------|
+| `false` | No check — every request is allowed through. **Default.** |
+| `true` | The `authorization` header must be present and non-empty. |
+| `string` | The named header (case-insensitive) must be present and non-empty. |
+| `function` | Custom predicate `(req: IncomingMessage) => boolean \| Promise<boolean>`. Return `true` to allow, `false` to reject. |
+
+A rejected request receives **`401 Unauthorized`**.
+If the function throws, the response is **`500 Internal Server Error`**.
+
+### Usage Examples
+
+#### Require the `Authorization` header (REST)
+
+```typescript
+handlers: [
+  {
+    pattern: '/api/profile',
+    method: 'GET',
+    authenticate: true, // 401 if Authorization header is missing or empty
+    handle: async (req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ user: 'me' }));
+    }
+  }
+]
+```
+
+#### Require a custom header (REST)
+
+```typescript
+handlers: [
+  {
+    pattern: '/api/admin',
+    method: 'GET',
+    authenticate: 'x-api-key', // 401 if x-api-key header is missing or empty
+    handle: async (req, res) => { /* ... */ }
+  }
+]
+```
+
+#### Custom async function (REST)
+
+```typescript
+handlers: [
+  {
+    pattern: '/api/orders',
+    method: 'GET',
+    authenticate: async (req) => {
+      const token = req.headers['authorization']?.replace('Bearer ', '');
+      if (!token) return false;
+      try {
+        return (await verifyToken(token)) !== null;
+      } catch {
+        return false;
+      }
+    },
+    handle: async (req, res) => { /* ... */ }
+  }
+]
+```
+
+#### Require the `Authorization` header (WebSocket)
+
+```typescript
+wsHandlers: [
+  {
+    pattern: '/ws/private',
+    authenticate: true,
+    onConnect: (conn) => conn.send({ type: 'welcome' })
+  }
+]
+```
+
+#### Custom async function (WebSocket)
+
+```typescript
+wsHandlers: [
+  {
+    pattern: '/ws/game',
+    authenticate: async (req) => {
+      const token = new URLSearchParams(req.url?.split('?')[1]).get('token');
+      return token === 'valid-token';
+    },
+    onConnect: (conn) => { /* ... */ }
+  }
+]
+```
+
+---
+
 ## ⚠️ Important Notes
 
 ### Handler Middleware Scope
@@ -1902,7 +2064,7 @@ universalApi({
 **Solutions:**
 - Ensure `enableWs: true` is set
 - Check `wsHandlers` pattern matches your WebSocket URL
-- Verify `authenticate` function (if defined) returns `true`
+- Verify `authenticate` option (if set) allows the request — use `authenticate: false` to bypass it during debugging
 - Check browser console and Vite server logs
 
 ```typescript

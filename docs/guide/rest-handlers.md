@@ -706,6 +706,42 @@ interface CreateUserBody {
 }
 ```
 
+### Protected Endpoint with `authenticate`
+
+Use `authenticate: true` for a quick Bearer-token gate, or pass a function for full custom logic:
+
+```typescript
+// Require the Authorization header to be present
+{
+  pattern: '/profile',
+  method: 'GET',
+  authenticate: true,
+  handle: async (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ user: 'me' }))
+  }
+}
+
+// Token validation with async function
+{
+  pattern: '/orders',
+  method: 'GET',
+  authenticate: async (req) => {
+    const token = req.headers['authorization']?.replace('Bearer ', '')
+    if (!token) return false
+    try {
+      return (await verifyToken(token)) !== null
+    } catch {
+      return false
+    }
+  },
+  handle: async (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ orders: [] }))
+  }
+}
+```
+
 ### Simulating Errors
 
 ```typescript
@@ -739,6 +775,66 @@ Use `disabled: true` to temporarily turn off a handler without removing it:
   }
 }
 ```
+
+### Authentication
+
+The `authenticate` option lets you protect individual handlers without writing authentication logic inside the handler body. It is evaluated **before** the handler runs, and automatically responds with `401 Unauthorized` when the check fails.
+
+```typescript
+type UniversalApiAuthenticate =
+  | false                                                         // no check (default)
+  | true                                                          // require Authorization header
+  | string                                                        // require a specific header
+  | ((req: IncomingMessage) => boolean | Promise<boolean>)        // custom predicate
+```
+
+**Require the `Authorization` header:**
+
+```typescript
+{
+  pattern: '/profile',
+  method: 'GET',
+  authenticate: true,   // 401 if Authorization header is absent or empty
+  handle: async (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ user: 'me' }))
+  }
+}
+```
+
+**Require a custom header (e.g. an API key):**
+
+```typescript
+{
+  pattern: '/admin/settings',
+  method: 'GET',
+  authenticate: 'x-api-key',   // 401 if x-api-key header is absent or empty
+  handle: async (req, res) => { /* ... */ }
+}
+```
+
+**Custom async validation:**
+
+```typescript
+{
+  pattern: '/orders',
+  method: 'GET',
+  authenticate: async (req) => {
+    const token = req.headers['authorization']?.replace('Bearer ', '')
+    if (!token) return false
+    try {
+      return (await verifyToken(token)) !== null
+    } catch {
+      return false
+    }
+  },
+  handle: async (req, res) => { /* ... */ }
+}
+```
+
+> **Note:** If the `authenticate` function throws an uncaught error, the plugin responds with `500 Internal Server Error`. Always handle expected error cases by returning `false` rather than throwing.
+
+> **Note:** `authenticate` runs before middleware and body parsing. The `req` object inside the predicate is the raw `IncomingMessage` — `req.body`, `req.params`, and `req.query` are not yet available.
 
 ## Next Steps
 

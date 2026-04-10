@@ -100,13 +100,22 @@ wsHandlers: [
 4. **Check authentication**
 
 ```typescript
+// WebSocket — temporarily allow all connections for debugging
 wsHandlers: [
   {
     pattern: '/ws/private',
-    authenticate: async (req) => {
-      // If this returns success: false, connection is rejected
-      return { success: true }
-    }
+    authenticate: false,  // Disable auth check during debugging
+    onConnect: (conn) => { ... }
+  }
+]
+
+// REST — temporarily allow all requests for debugging
+handlers: [
+  {
+    pattern: '/protected',
+    method: 'GET',
+    authenticate: false,  // Disable auth check during debugging
+    handle: async (req, res) => { ... }
   }
 ]
 ```
