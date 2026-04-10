@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Connect, PreviewServer, ViteDevServer } from "vite";
-import { ApiWsRestFsDataResponse, UniversalApiRestFsHandler, UniversalApiOptionsRequired, UniversalApiRequest, HandledRequestData, UniversalApiWsHandler } from "../models/index.model";
+import { ApiWsRestFsDataResponse, UniversalApiRestFsHandler, UniversalApiOptionsRequired, UniversalApiRequest, HandledRequestData, UniversalApiWsHandler, UniversalApiAuthenticate } from "../models/plugin.model";
 import { Utils } from "./utils";
 import { join, parse } from "node:path";
 import { MimeType } from "./MimeType";
@@ -11,6 +11,19 @@ import { ConnectionManager, WebSocketConnection, WebSocketServer } from "./WebSo
 import { ILogger } from "../models/logger.model";
 import { Socket } from "node:net";
 
+
+async function checkAuthenticate(authenticate: UniversalApiAuthenticate | undefined, req: IncomingMessage): Promise<boolean> {
+	if (!authenticate) return true;
+	if (authenticate === true) {
+		const value = req.headers["authorization"];
+		return typeof value === "string" ? value.trim().length > 0 : false;
+	}
+	if (typeof authenticate === "string") {
+		const value = req.headers[authenticate.toLowerCase()];
+		return typeof value === "string" ? value.trim().length > 0 : false;
+	}
+	return await authenticate(req);
+}
 
 /* v8 ignore start */
 /**
@@ -430,7 +443,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 					}
 					if (removeFile) {
 						await Utils.files.removeFile(file);
-						result.headers.push({name: Constants.DELETED_ELEMENTS_HEADER, value: 1});
+						result.headers.push({ name: Constants.DELETED_ELEMENTS_HEADER, value: 1 });
 					}
 				} catch (error) {
 					if (error instanceof UniversalApiError) {
@@ -479,6 +492,22 @@ async function handlingApiRestRequest(logger: ILogger, matcher: AntPathMatcher, 
 		if (handler !== null) {
 			logger.debug("handlingApiRestRequest: using REST api");
 			logger.info("Request handling with REST API: handler matched= ", handler.pattern);
+
+			if (handler.authenticate) {
+				try {
+					const allowed = await checkAuthenticate(handler.authenticate, request);
+					if (!allowed) {
+						logger.debug("handlingApiRestRequest: authenticate rejected " + fullUrl.pathname);
+						throw new UniversalApiError("Unauthorized", "ERROR", fullUrl.pathname, 401);
+					}
+				} catch (err: any) {
+					if (err instanceof UniversalApiError) {
+						throw err;
+					}
+					throw new UniversalApiError(err as Error, "ERROR", fullUrl.pathname, 500);
+				}
+			}
+
 			const chain = Utils.request.MiddlewaresChain();
 			try {
 				chain.use(middlewares, errorMiddlewares);
@@ -685,21 +714,21 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 					noServer: true,
 					...(
 						handler.perMessageDeflate !== undefined
-						? { perMessageDeflate: handler.perMessageDeflate }
+							? { perMessageDeflate: handler.perMessageDeflate }
 							: {}
 					),
 					...(
 						handler.subprotocols?.length
-						? {
-							handleProtocols: (protocols) => {
-								for (const p of protocols) {
+							? {
+								handleProtocols: (protocols) => {
+									for (const p of protocols) {
 										if (handler.subprotocols!.includes(p)) {
 											return p;
 										}
+									}
+									return false;
 								}
-								return false;
 							}
-						}
 							: {}
 					)
 				}));
@@ -742,7 +771,7 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 
 		if (currentHandler.authenticate) {
 			try {
-				const allowed = await currentHandler.authenticate(req);
+				const allowed = await checkAuthenticate(currentHandler.authenticate, req);
 				if (!allowed) {
 					logger.debug(`runWsPlugin: authenticate rejected ${url.pathname}`);
 					socket.end("HTTP/1.1 401 Unauthorized\r\n\r\n");
