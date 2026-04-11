@@ -199,7 +199,7 @@ export async function getUsers() {
     - requests go to **`https://api.example.com/users`**
     - your app behaves like a standard client
 
-### **::: tip**
+::: tip
 
 **`vite-plugin-universal-api`** only affects development.
 
