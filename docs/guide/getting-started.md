@@ -139,7 +139,7 @@ export async function getUsers() {
 npm run dev
 ```
 
-### 4. Access Your Mock API
+### 5. Access Your Mock API
 
 Your mock data is now available:
 
