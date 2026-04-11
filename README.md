@@ -6,7 +6,7 @@
 
 # vite-plugin-universal-api
 
-### Seamless Mock APIs, Accelerate Your Development Journey
+### Accelerate Your Development Journey with Mock APIs without changing your client code.
 
 [![npm version](https://img.shields.io/npm/v/%40ndriadev/vite-plugin-universal-api?color=orange&style=for-the-badge)](https://www.npmjs.com/package/%40ndriadev/vite-plugin-universal-api)
 ![npm bundle size](https://img.shields.io/bundlephobia/minzip/%40ndriadev%2Fvite-plugin-universal-api?style=for-the-badge&label=SIZE&color=yellow)
@@ -42,6 +42,10 @@
   - [REST API Handlers](#rest-api-handlers)
   - [WebSocket Handlers](#websocket-handlers)
   - [File-System Based API](#file-system-based-api)
+- [How it works](#how-it-works)
+  - [Vite proxy](#vite-proxy)
+  - [When to use what](#when-to-use-what)
+  - [Environment variables](#environment-variables)
 - [Usage Examples](#-usage-examples)
   - [File-Based Mocking](#file-based-mocking)
   - [Custom REST Handlers](#custom-rest-handlers)
@@ -608,7 +612,102 @@ interface WebSocketHandler {
 }
 ```
 
----
+## ⚙️ How it works
+
+**`vite-plugin-universal-api`** only affects development. In production, your application performs real HTTP requests.
+In a real application, you typically want to:
+
+- use local APIs during development
+- call real APIs in production
+
+You can achieve this with a simple base URL configuration:
+
+```ts
+// api.ts
+export const API_BASE_URL = import.meta.env.PROD
+  ? 'https://api.example.com'
+  : '/api'
+
+
+// usage.ts
+import {API_BASE_URL }from'./api'
+
+export async function getUsers() {
+    const res = await fetch(`${API_BASE_URL}/users`)
+    return res.json()
+}
+```
+
+- **In development**
+    - **`/api/users`** is intercepted by **`vite-plugin-universal-api`**
+    - you can return mocked or locally defined responses
+- **In production**
+    - requests go directly to **`https://api.example.com/users`**
+
+This means you can develop without a backend and switch to real APIs without changing your code.
+
+### Vite proxy
+Instead of defining local API endpoints, you can forward requests to a real backend during development using Vite's proxy.
+
+```ts
+// vite.config.ts
+export default {
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://api.example.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
+      }
+    }
+  }
+}
+```
+
+You can then call your API as usual:
+
+```ts
+// in your file
+...
+fetch('/api/users')
+```
+
+### When to use what
+
+- **`vite-plugin-universal-api`** → mock or local APIs
+- Vite proxy → real backend during development
+
+Both approaches work with the same client code.
+
+### Environment variables
+
+For more flexibility, use .env files:
+
+```bash
+# .env.development
+VITE_API_BASE_URL=/api
+
+# .env.production
+VITE_API_BASE_URL=https://api.example.com
+```
+
+```ts
+// api.ts
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+
+// services/users.ts
+import {API_BASE_URL }from'../api'
+
+export async function getUsers() {
+    const res = await fetch(`${API_BASE_URL}/users`)
+    return res.json()
+}
+```
+
+### Result
+
+- **`Development`** → mocked response from local files
+- **`Production`** → real API calls
 
 ## 💡 Usage Examples
 

@@ -68,13 +68,22 @@ project/
 ### Step 3: Use in Your App
 
 ```typescript
+// In a config file config.ts
+export const API_BASE_URL = import.meta.env.PROD
+  ? 'https://api.example.com' //production usage
+  : '/api'
+
 // In your React/Vue/Svelte app
+import {API_BASE_URL} from './config.ts';
+
 async function fetchUsers() {
-  const response = await fetch('/api/users')
+  const response = await fetch(`${API_BASE_URL}/users`)
   const users = await response.json()
   console.log(users)
 }
 ```
+
+That's it — no changes needed between development and production.
 
 ### With Pagination & Filters
 

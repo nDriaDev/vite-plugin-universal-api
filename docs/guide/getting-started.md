@@ -114,7 +114,26 @@ Add some mock data:
 ]
 ```
 
-### 3. Start Development Server
+This file will handle requests to:
+
+```ts
+GET /api/users
+```
+
+### 3. Call the API from your app
+```ts
+// services/users.ts
+export async function getUsers() {
+    const res = await fetch('/api/users')
+
+    if (!res.ok) {
+        throw new Error('Failed to fetch users')
+    }
+
+    return res.json()
+}
+```
+### 4. Start Development Server
 
 ```bash
 npm run dev
@@ -124,9 +143,10 @@ npm run dev
 
 Your mock data is now available:
 
-```bash
+```ts
 # Fetch all users
-curl http://localhost:5173/api/users
+...
+const result = await getUsers();
 
 # Returns:
 # [
@@ -134,6 +154,101 @@ curl http://localhost:5173/api/users
 #   {"id": 2, "name": "Jane Smith", "email": "jane@example.com"}
 # ]
 ```
+
+## 🌐 Using real APIs in production
+
+In a real application, you usually want:
+
+- **mocked endpoints during development**
+- **real APIs in production**
+
+You can achieve this with a simple configuration.
+
+### Centralize your API base URL
+
+```ts
+// api.ts
+export const API_BASE_URL=import.meta.env.PROD
+    ? 'https://api.example.com'
+    : '/api'
+```
+
+### Use it in your services
+
+```ts
+// services/users.ts
+import {API_BASE_URL }from'../api'
+
+export async function getUsers() {
+    const res = await fetch(`${API_BASE_URL}/users`)
+
+    if (!res.ok) {
+        throw new Error('Failed to fetch users')
+    }
+
+    return res.json()
+}
+```
+
+### How it works
+
+- **Development**
+    - **`/api/users`** is handled by **`vite-plugin-universal-api`**
+    - responses come from your local files (e.g. **`api/users.get.ts`**)
+- **Production**
+    - requests go to **`https://api.example.com/users`**
+    - your app behaves like a standard client
+
+### **::: tip**
+
+**`vite-plugin-universal-api`** only affects development.
+
+In production, your application performs real HTTP requests.
+
+:::
+
+### 🧪 Optional: Environment variables
+
+For more flexibility, use **`.env`** files:
+
+```bash
+# .env.development
+VITE_API_BASE_URL=/api
+
+# .env.production
+VITE_API_BASE_URL=https://api.example.com
+```
+
+```ts
+// api.ts
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+```
+
+### 🔧 Alternative: Vite proxy
+
+If you prefer not to define local endpoints, you can proxy requests:
+
+```ts
+// vite.config.ts
+export default {
+    server: {
+        proxy: {
+            '/api': {
+                target:'https://api.example.com',
+                changeOrigin:true,
+                rewrite: (path) =>path.replace(/^\/api/,'')
+            }
+        }
+    }
+}
+```
+
+### 🧠 Summary
+
+- define API routes as files during development
+- call them using **`fetch('/api/...')`**
+- switch to real APIs in production with a base URL
+- no changes needed in your business logic
 
 ## What's Next?
 

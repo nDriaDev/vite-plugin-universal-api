@@ -86,6 +86,71 @@ universalApi({
 })
 ```
 
+## Development strategies
+
+### 1. Local APIs (vite-plugin-universal-api)
+
+- fully mocked
+- no backend required
+
+```ts
+// api/users.handler.ts
+export default {
+    pattern: '/users/{id}',
+    method: 'GET',
+    handle: async (req, res) => {
+        const user = await db.findUser(req.params.id)
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify(user))
+    }
+}
+```
+
+### 2. Real backend via Vite proxy
+
+- no mocks
+- real API during development
+
+```ts
+// vite.config.ts
+export default {
+    server: {
+        proxy: {
+            '/api': {
+                target:'https://api.example.com',
+                changeOrigin:true,
+                rewrite: (path) =>path.replace(/^\/api/,'')
+            }
+        }
+    }
+}
+```
+
+### Shared client code
+
+```ts
+fetch('/api/users')
+```
+
+Both approaches work without changing your application code. You can switch between mocked APIs and a real backend without changing your client code.
+
+### Optional: Environment variables
+
+For more flexibility, use **`.env`** files:
+
+```bash
+# .env.development
+VITE_API_BASE_URL=/api
+
+# .env.production
+VITE_API_BASE_URL=https://api.example.com
+```
+
+```ts
+// api.ts
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+```
+
 ## Browse All Examples
 
 Click on any example below to see the complete implementation:
