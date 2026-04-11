@@ -155,7 +155,7 @@ const result = await getUsers();
 # ]
 ```
 
-## 🌐 Using real APIs in production
+## Using real APIs in production
 
 In a real application, you usually want:
 
@@ -207,7 +207,7 @@ In production, your application performs real HTTP requests.
 
 :::
 
-### 🧪 Optional: Environment variables
+### Optional: Environment variables
 
 For more flexibility, use **`.env`** files:
 
@@ -224,7 +224,7 @@ VITE_API_BASE_URL=https://api.example.com
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 ```
 
-### 🔧 Alternative: Vite proxy
+### Alternative: Vite proxy
 
 If you prefer not to define local endpoints, you can proxy requests:
 
@@ -243,7 +243,7 @@ export default {
 }
 ```
 
-### 🧠 Summary
+### Summary
 
 - define API routes as files during development
 - call them using **`fetch('/api/...')`**
