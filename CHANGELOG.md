@@ -1,5 +1,22 @@
 ### [1.0.4](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v1.0.4) - 2026-02-09
 
+## [2.2.0](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v2.2.0) - 2026-04-15
+
+### Bug Fixes
+
+- stdout/stderr uncaughtException ([fc2ceb1](https://github.com/nDriaDev/vite-plugin-universal-api/commit/fc2ceb1))
+
+### Documentation
+
+- update documentations ([05d4e74](https://github.com/nDriaDev/vite-plugin-universal-api/commit/05d4e74))
+- update documentations ([14efce0](https://github.com/nDriaDev/vite-plugin-universal-api/commit/14efce0))
+- update documentations ([94bccbf](https://github.com/nDriaDev/vite-plugin-universal-api/commit/94bccbf))
+- update documentations ([f7a2e53](https://github.com/nDriaDev/vite-plugin-universal-api/commit/f7a2e53))
+
+### Chores
+
+- update dependencies ([72fa40a](https://github.com/nDriaDev/vite-plugin-universal-api/commit/72fa40a))
+
 ## [2.1.0](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v2.1.0) - 2026-04-10
 
 ### Features
