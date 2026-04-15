@@ -31,6 +31,25 @@ export function universalApiPlugin(opts?: UniversalApiOptions): Plugin {
 
 			logger.info(`plugin ${options.disable ? "disabled" : "started"}`);
 			logger.debug("Vite configResolved: FINISH");
+			/* v8 ignore start */
+			/**
+			 * INFO
+			 * plugin print on process.stoud/sterr with console. If the process running in background,
+			 * when client disconnect session, stdout/stderr receive EIO/EPIPE error.
+			 * So register an hanlder to avoid process's death for uncaughtException
+			 */
+			const suppressIoError = (err: NodeJS.ErrnoException) => {
+				if (err.code !== 'EIO' && err.code !== 'EPIPE') {
+					throw err;
+				}
+			};
+			if (process.stdout.listenerCount('error') === 0) {
+				process.stdout.on('error', suppressIoError);
+			}
+			if (process.stderr.listenerCount('error') === 0) {
+				process.stderr.on('error', suppressIoError);
+			}
+			/* v8 ignore stop */
 		},
 		configureServer(server) {
 			if (options.disable) {
