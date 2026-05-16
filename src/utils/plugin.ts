@@ -718,12 +718,27 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 	}
 }
 
-export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogger, options: UniversalApiOptionsRequired) => {
+export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogger, options: UniversalApiOptionsRequired, isPreview = false) => {
 	logger.debug(`runWsPlugin: START`);
 	const { enableWs, wsHandlers } = options;
 	const httpServer = server.httpServer;
-	if (!httpServer || !enableWs || wsHandlers.length === 0) {
-		logger.debug(`runWsPlugin disabled${!httpServer ? ": no http server found" : enableWs ? ": no handlers found" : ""}`);
+
+	/**
+	 * INFO
+	 * WebSocket support is intentionally restricted to the Vite dev server.
+	 * WS is therefore disabled when called from configurePreviewServer.
+	 */
+	if (!httpServer || !enableWs || wsHandlers.length === 0 || isPreview) {
+		logger.debug(
+			`runWsPlugin disabled${!httpServer
+				? ": no http server found"
+				: isPreview
+					? ": WebSocket is not supported in preview mode"
+					: enableWs
+						? ": no handlers found"
+						: ""
+			}`
+		);
 		return undefined;
 	}
 
@@ -787,7 +802,18 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 
 		if (handler === null) {
 			logger.debug(`runWsPlugin: no handler for ${url.pathname}`);
-			socket.end("HTTP/1.1 404 Not Found\r\n\r\n");
+			/**
+			 * INFO
+			 * Do NOT call socket.end() here.
+			 * If the path matches our prefix but no specific handler is found, we
+			 * reject it — the request was clearly directed at this plugin and no
+			 * other listener should claim it.
+			 */
+			const matchesOurPrefix = Utils.request.matchesEndpointPrefix(req.url, options.endpointPrefix);
+			if (matchesOurPrefix) {
+				logger.debug(`runWsPlugin: path matches prefix but no WS handler registered — rejecting`);
+				socket.end("HTTP/1.1 404 Not Found\r\n\r\n");
+			}
 			return;
 		}
 

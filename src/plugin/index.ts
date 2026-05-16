@@ -84,7 +84,7 @@ export function universalApiPlugin(opts?: UniversalApiOptions): Plugin {
 
 		server.middlewares.use(middlewareFn);
 
-		const cleanup = runWsPlugin(server, logger, options);
+		const cleanup = runWsPlugin(server, logger, options, isPreview);
 		server.httpServer.once("close", () => cleanup?.());
 	}
 

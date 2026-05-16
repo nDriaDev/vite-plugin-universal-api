@@ -1833,9 +1833,30 @@ export type UniversalApiOptions = UniversalApiBaseOptions & (
 		 * Enable WebSocket support.
 		 * When true, wsHandlers becomes required.
 		 *
+		 * **Dev server only.** WebSocket connections are handled exclusively by the
+		 * Vite dev server. When this flag is `true`, WebSocket upgrade listeners are
+		 * never registered in preview mode (`vite preview`) because the preview
+		 * server has no HMR infrastructure, and attaching an upgrade handler there
+		 * would intercept — and break — any proxy-based WebSocket connections the
+		 * user may have configured via `preview.proxy`.
+		 *
+		 * As a consequence, `enablePreview` has no effect on WebSocket when
+		 * `enableWs` is `true`: HTTP request handling still works in preview (if
+		 * `enablePreview` is not `false`), but WebSocket handlers are silently
+		 * inactive there.
+		 *
 		 * @default false
 		 */
 		enableWs: true;
+		/**
+		 * Not available when `enableWs` is `true`.
+		 *
+		 * WebSocket support is restricted to the dev server; setting
+		 * `enablePreview: true` alongside `enableWs: true` would create a
+		 * misleading expectation that WS also works in preview mode.
+		 * Use `enableWs: false` (or omit it) if you need `enablePreview` control.
+		 */
+		enablePreview?: never;
 		/**
 		 * WebSocket handler configurations.
 		 *
