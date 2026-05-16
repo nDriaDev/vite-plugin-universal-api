@@ -431,13 +431,19 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 								JSON.stringify(dataFile.originalData[key]) === JSON.stringify(dataFile.data[key]) && delete (newData as Record<string, any>)[key];
 							})
 						}
-						// INFO partial delete allowed allowed in json file with array
 						if (Array.isArray(newData) && newData.length > 0) {
 							removeFile = false;
 							await Utils.files.writingFile(file, fileFound, newData, MimeType[".json"], true);
 							result.headers.push({
 								name: Constants.DELETED_ELEMENTS_HEADER,
 								value: dataFile.originalData.length - newData.length
+							});
+						} else if (!Array.isArray(newData) && Object.keys(newData).length > 0) {
+							removeFile = false;
+							await Utils.files.writingFile(file, fileFound, newData, MimeType[".json"], true);
+							result.headers.push({
+								name: Constants.DELETED_ELEMENTS_HEADER,
+								value: 0
 							});
 						}
 					}
