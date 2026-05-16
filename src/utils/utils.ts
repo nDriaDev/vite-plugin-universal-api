@@ -416,16 +416,21 @@ export const Utils = {
 				if (parserRequest) {
 					logger.debug("parseRequest: START");
 					if (typeof parserRequest === "object") {
-						const { promise, reject, resolve } = Utils.plugin.promiseWithResolver<any>();
-						const next = (error?: any) => resolve(error);
 						let parserFunc: UniversalApiParserFunction[] = [];
 						if (!Array.isArray(parserRequest.parser)) {
 							parserFunc.push(parserRequest.parser);
 						} else {
 							parserFunc = parserRequest.parser;
 						}
-						Promise.all(parserFunc.map(callbackfn => callbackfn(request, res, next))).then(() => resolve("done")).catch(reject);
-						await promise;
+						for (const parserFn of parserFunc) {
+							await new Promise<void>((resolve, reject) => {
+								const next = (error?: any) => error ? reject(error) : resolve();
+								const result = parserFn(request, res, next);
+								if (result && typeof (result as any).then === "function") {
+									(result as Promise<void>).then(() => resolve(), reject);
+								}
+							});
+						}
 						const { body, files, query } = parserRequest.transform(request);
 						body != undefined && (request.body = body);
 						files != undefined && (request.files = files);
