@@ -54,45 +54,51 @@ export function universalApiPlugin(opts?: UniversalApiOptions): Plugin {
 		configureServer(server) {
 			if (options.disable) {
 				currentHandler = null;
-				return;
+			} else {
+				logger.debug("Vite configureServer: START", `options= ${JSON.stringify({ ...options, config: "", matcher: "" }, null, 2)}`);
+				currentHandler = async (req, res, next) => {
+					await runPlugin(req, res, next, logger, options);
+				};
+				logger.debug("Vite configureServer: FINISH");
 			}
-			logger.debug("Vite configureServer: START", `options= ${JSON.stringify({ ...options, config: "", matcher: "" }, null, 2)}`);
-			currentHandler = async (req, res, next) => {
-				await runPlugin(req, res, next, logger, options);
-			};
 			if (server.httpServer && server.httpServer !== registeredOnServer) {
 				registeredOnServer = server.httpServer;
 				server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => {
-					await currentHandler!(req, res, next);
+					if (currentHandler === null) {
+						next();
+						return;
+					}
+					await currentHandler(req, res, next);
 				});
 				const cleanup = runWsPlugin(server, logger, options);
-				server.httpServer?.once("close", () => cleanup?.());
+				server.httpServer.once("close", () => cleanup?.());
 			}
-			logger.debug("Vite configureServer: FINISH");
 		},
 		configurePreviewServer(server) {
-			if (options.disable) {
+			if (options.disable || !options.enablePreview) {
+				if (!options.disable) {
+					logger.debug("Vite configurePreviewServer: disabled in preview mode");
+				}
 				currentHandler = null;
-				return;
+			} else {
+				logger.debug("Vite configurePreviewServer: START", `options= ${JSON.stringify({ ...options, config: "", matcher: "" }, null, 2)}`);
+				currentHandler = async (req, res, next) => {
+					await runPlugin(req, res, next, logger, options);
+				};
+				logger.debug("Vite configurePreviewServer: FINISH");
 			}
-			if (!options.enablePreview) {
-				logger.debug("Vite configurePreviewServer: disabled in preview mode");
-				currentHandler = null;
-				return;
-			}
-			logger.debug("Vite configurePreviewServer: START", `options= ${JSON.stringify({ ...options, config: "", matcher: "" }, null, 2)}`);
-			currentHandler = async (req, res, next) => {
-				await runPlugin(req, res, next, logger, options);
-			};
 			if (server.httpServer && server.httpServer !== registeredOnServer) {
 				registeredOnServer = server.httpServer;
 				server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => {
-					await currentHandler!(req, res, next);
+					if (currentHandler === null) {
+						next();
+						return;
+					}
+					await currentHandler(req, res, next);
 				});
 				const cleanup = runWsPlugin(server, logger, options);
-				server.httpServer?.once("close", () => cleanup?.());
+				server.httpServer.once("close", () => cleanup?.());
 			}
-			logger.debug("Vite configurePreviewServer: FINISH");
 		}
 	}
 }
