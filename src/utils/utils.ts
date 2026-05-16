@@ -49,14 +49,15 @@ export const Utils = {
 		},
 		initOptions(opts: UniversalApiOptions | undefined, config: ResolvedConfig): UniversalApiOptionsRequired {
 			const fullFsDir = join(config.root, opts?.fsDir ?? "");
+			const normalizePrefix = (el: string): string => {
+				let endpoint = Utils.request.addSlash(el, "leading");
+				endpoint = Utils.request.removeSlash(endpoint, "trailing");
+				return endpoint;
+			};
 			const endpointPrefix = opts?.endpointPrefix
 				? Array.isArray(opts.endpointPrefix) && opts.endpointPrefix.length > 0
-					? opts.endpointPrefix.map(el => {
-						let endpoint = Utils.request.addSlash(el, "leading");
-						endpoint = Utils.request.removeSlash(endpoint, "trailing");
-						return endpoint;
-					})
-					: Array.isArray(opts.endpointPrefix) ? opts.endpointPrefix : [opts.endpointPrefix]
+					? opts.endpointPrefix.map(normalizePrefix)
+					: Array.isArray(opts.endpointPrefix) ? opts.endpointPrefix : [normalizePrefix(opts.endpointPrefix)]
 				: ['/api'];
 			return {
 				disable: opts?.disable ?? false,
