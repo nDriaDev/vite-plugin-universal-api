@@ -1205,23 +1205,36 @@ export const Utils = {
 			logger.debug(`settingResponse: START`);
 			try {
 				const { promise, reject, resolve } = Utils.plugin.promiseWithResolver();
-				function callbackErrorWritingResponse(error: Error | null | undefined) {
+
+				const endResponse = () => {
 					try {
-						if (error instanceof Error) {
-							logger.debug(`settingResponse: ERROR - failed to write response `, error as any);
-							res.statusCode = Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR;
-							res.write(JSON.stringify({
+						!res.writableEnded && res.end();
+						resolve(null);
+					} catch (error) {
+						reject(error);
+					}
+				};
+
+				function callbackErrorWritingResponse(error: Error | null | undefined) {
+					if (error instanceof Error) {
+						logger.debug(`settingResponse: ERROR - failed to write response `, error as any);
+						if (res.writableEnded) {
+							resolve(null);
+							return;
+						}
+						res.statusCode = Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR;
+						res.write(
+							JSON.stringify({
 								status: Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR,
 								error: Object.entries(Constants.HTTP_STATUS_CODE).find(el => el[1] === responseData.status)?.[0] ?? "Internal Server Error",
 								message: "Error writing response",
 								path: "",
 								timestamp: new Date().toISOString()
-							}));
-						}
-						!res.writableEnded && res.end();
-						resolve(null);
-					} catch (error) {
-						reject(error);
+							}),
+							endResponse
+						);
+					} else {
+						endResponse();
 					}
 				}
 				let responseData = data;
@@ -1318,8 +1331,7 @@ export const Utils = {
 					if (responseData.data !== this.NO_RESPONSE) {
 						res.write(responseData.data, callbackErrorWritingResponse);
 					} else {
-						!res.writableEnded && res.end();
-						resolve(null);
+						endResponse();
 					}
 				}
 				return await promise;
