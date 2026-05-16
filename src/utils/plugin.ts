@@ -606,11 +606,31 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 	try {
 		const { gatewayTimeout, errorMiddlewares, noHandledRestFsRequestsAction: noHandledRequestsAction } = options;
 		const { promise, reject, resolve } = Utils.plugin.promiseWithResolver<ApiWsRestFsDataResponse>();
-		let gatewayIdTimeout: NodeJS.Timeout;
+
+		let settled = false;
+		let gatewayIdTimeout: NodeJS.Timeout | undefined;
+
+		const settleResolve = (value: ApiWsRestFsDataResponse) => {
+			if (settled) {
+				return;
+			}
+			settled = true;
+			clearTimeout(gatewayIdTimeout);
+			resolve(value);
+		};
+
+		const settleReject = (reason: unknown) => {
+			if (settled) {
+				return;
+			}
+			settled = true;
+			clearTimeout(gatewayIdTimeout);
+			reject(reason);
+		};
 
 		if (gatewayTimeout !== 0) {
 			gatewayIdTimeout = setTimeout(() => {
-				resolve({
+				settleResolve({
 					status: Constants.HTTP_STATUS_CODE.GATEWAY_TIMEOUT,
 					readFile: false,
 					isError: true,
@@ -624,9 +644,8 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 
 		runPluginInternal(req, response, logger, options)
 			.then(result => {
-				clearTimeout(gatewayIdTimeout);
 				const { status, data, headers } = result;
-				resolve({
+				settleResolve({
 					status: status!,
 					data,
 					readFile: false,
@@ -634,8 +653,7 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 					headers
 				});
 			})
-			.catch(async (error: UniversalApiError) => {
-				clearTimeout(gatewayIdTimeout);
+			.catch((error: UniversalApiError) => {
 				const dataResponse: ApiWsRestFsDataResponse = {
 					status: Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR,
 					data: error.message,
@@ -650,7 +668,7 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 				switch (error.getType()) {
 					case "NO_HANDLER":
 						if (noHandledRequestsAction === "forward") {
-							reject("next");
+							settleReject("next");
 							callReject = true;
 						} else {
 							dataResponse.status = Constants.HTTP_STATUS_CODE.NOT_FOUND;
@@ -682,7 +700,7 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 						dataResponse.data = dataResponse.data ?? "Internal Server Error";
 						break;
 				}
-				!callReject && resolve(dataResponse);
+				!callReject && settleResolve(dataResponse);
 			});
 
 		logger.debug(`runPlugin: awaiting runInternalPlugin execution`);
