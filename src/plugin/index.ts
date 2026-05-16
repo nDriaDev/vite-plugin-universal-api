@@ -7,10 +7,30 @@ import { IncomingMessage, ServerResponse } from "node:http";
 import { runPlugin, runWsPlugin } from "../utils/plugin";
 
 export function universalApiPlugin(opts?: UniversalApiOptions): Plugin {
-	let options: UniversalApiOptionsRequired,
-		logger: Logger,
-		currentHandler: ((req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => Promise<void>) | null = null,
-		registeredOnServer: HttpServer | null = null;
+	let options: UniversalApiOptionsRequired = {
+		disable: true,
+		logLevel: "info",
+		delay: 0,
+		gatewayTimeout: 0,
+		endpointPrefix: [],
+		enableWs: false,
+		enablePreview: true,
+		fsDir: null,
+		fullFsDir: null,
+		noHandledRestFsRequestsAction: "404",
+		parser: true,
+		middlewares: [],
+		errorMiddlewares: [],
+		handlers: [],
+		wsHandlers: [],
+		pagination: null,
+		filters: null,
+		config: {} as UniversalApiOptionsRequired["config"],
+		matcher: {} as UniversalApiOptionsRequired["matcher"],
+	};
+	let logger: Logger = new Logger(Constants.PLUGIN_NAME, "info");
+	let currentHandler: ((req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => Promise<void>) | null = null;
+	let registeredOnServer: HttpServer | null = null;
 
 	return {
 		name: Constants.PLUGIN_NAME,
