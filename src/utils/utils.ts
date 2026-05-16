@@ -1231,6 +1231,7 @@ export const Utils = {
 									{ name: "content-type", value: ext in MimeType ? MimeType[ext as keyof typeof MimeType] : MimeType[".bin"] },
 									{ name: "content-length", value: size }
 								]);
+								responseData.data = this.NO_RESPONSE;
 							} else {
 								await this.sendStreamFile(res, responseData);
 							}
