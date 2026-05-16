@@ -421,30 +421,23 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 							logger.debug("handlingApiFsRequest: ERROR parsing json content file ", file!, error);
 							throw new UniversalApiError(`Error parsing json content file ${file}`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 						}
-						let newData: any[] | Record<string, any>;
+						/**
+						 * INFO
+						 * Pagination/filters only apply to JSON arrays (documented).
+						 * For JSON objects the filter acts as a match condition: if the
+						 * object passes, the whole file is deleted (removeFile stays true).
+						 */
 						if (Array.isArray(dataFile.originalData)) {
 							const toDeleteStrings = new Set((dataFile.data as Array<any>).map(el => JSON.stringify(el)));
-							newData = dataFile.originalData.filter(el => !toDeleteStrings.has(JSON.stringify(el)));
-						} else {
-							newData = structuredClone(dataFile.originalData);
-							Object.keys(dataFile.data).forEach(key => {
-								JSON.stringify(dataFile.originalData[key]) === JSON.stringify(dataFile.data[key]) && delete (newData as Record<string, any>)[key];
-							})
-						}
-						if (Array.isArray(newData) && newData.length > 0) {
-							removeFile = false;
-							await Utils.files.writingFile(file, fileFound, newData, MimeType[".json"], true);
-							result.headers.push({
-								name: Constants.DELETED_ELEMENTS_HEADER,
-								value: dataFile.originalData.length - newData.length
-							});
-						} else if (!Array.isArray(newData) && Object.keys(newData).length > 0) {
-							removeFile = false;
-							await Utils.files.writingFile(file, fileFound, newData, MimeType[".json"], true);
-							result.headers.push({
-								name: Constants.DELETED_ELEMENTS_HEADER,
-								value: 0
-							});
+							const newData = dataFile.originalData.filter(el => !toDeleteStrings.has(JSON.stringify(el)));
+							if (newData.length > 0) {
+								removeFile = false;
+								await Utils.files.writingFile(file, fileFound, newData, MimeType[".json"], true);
+								result.headers.push({
+									name: Constants.DELETED_ELEMENTS_HEADER,
+									value: dataFile.originalData.length - newData.length
+								});
+							}
 						}
 					}
 					if (removeFile) {
