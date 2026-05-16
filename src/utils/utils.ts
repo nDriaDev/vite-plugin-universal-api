@@ -12,25 +12,25 @@ import { UniversalApiError } from "./Error";
 import { ILogger } from "../models/logger.model";
 
 function patchWalkPath(target: any, path: string) {
-    const segments = path.split('/').filter(s => s !== '');
-    let current = target;
+	const segments = path.split('/').filter(s => s !== '');
+	let current = target;
 
-    for (let i = 0; i < segments.length - 1; i++) {
-        const key = segments[i];
+	for (let i = 0; i < segments.length - 1; i++) {
+		const key = segments[i];
 		if (!(key in current)) {
 			throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 		}
-        current = current[key];
-    }
+		current = current[key];
+	}
 
-    const lastKey = segments[segments.length - 1];
-    return { parent: current, key: lastKey };
+	const lastKey = segments[segments.length - 1];
+	return { parent: current, key: lastKey };
 }
 
 function patchGetValue(obj: any, path: string) {
-    if (path === '' || path === '/') return obj;
-    const { parent, key } = patchWalkPath(obj, path);
-    return parent[key];
+	if (path === '' || path === '/') return obj;
+	const { parent, key } = patchWalkPath(obj, path);
+	return parent[key];
 }
 
 export const Utils = {
@@ -47,38 +47,38 @@ export const Utils = {
 				resolve
 			}
 		},
-        initOptions(opts: UniversalApiOptions | undefined, config: ResolvedConfig): UniversalApiOptionsRequired {
-            const fullFsDir = join(config.root, opts?.fsDir ?? "");
-            const endpointPrefix = opts?.endpointPrefix
-                ? Array.isArray(opts.endpointPrefix) && opts.endpointPrefix.length > 0
-                    ? opts.endpointPrefix.map(el => {
-                        let endpoint = Utils.request.addSlash(el, "leading");
-                        endpoint = Utils.request.removeSlash(endpoint, "trailing");
-                        return endpoint;
-                    })
-                    : Array.isArray(opts.endpointPrefix) ? opts.endpointPrefix : [opts.endpointPrefix]
-                : ['/api'];
-            return {
-                disable: opts?.disable ?? false,
-                logLevel: opts?.logLevel || "info",
-                delay: opts?.delay ? opts.delay : 0,
-                gatewayTimeout: opts?.gatewayTimeout ?? 0,
+		initOptions(opts: UniversalApiOptions | undefined, config: ResolvedConfig): UniversalApiOptionsRequired {
+			const fullFsDir = join(config.root, opts?.fsDir ?? "");
+			const endpointPrefix = opts?.endpointPrefix
+				? Array.isArray(opts.endpointPrefix) && opts.endpointPrefix.length > 0
+					? opts.endpointPrefix.map(el => {
+						let endpoint = Utils.request.addSlash(el, "leading");
+						endpoint = Utils.request.removeSlash(endpoint, "trailing");
+						return endpoint;
+					})
+					: Array.isArray(opts.endpointPrefix) ? opts.endpointPrefix : [opts.endpointPrefix]
+				: ['/api'];
+			return {
+				disable: opts?.disable ?? false,
+				logLevel: opts?.logLevel || "info",
+				delay: opts?.delay ? opts.delay : 0,
+				gatewayTimeout: opts?.gatewayTimeout ?? 0,
 				endpointPrefix: endpointPrefix.filter(el => el !== "" && el !== "/"),
 				enableWs: opts?.enableWs ?? false,
 				enablePreview: opts?.enablePreview ?? true,
-                fsDir: opts?.fsDir ?? null,
-                fullFsDir: fullFsDir || null,
+				fsDir: opts?.fsDir ?? null,
+				fullFsDir: fullFsDir || null,
 				noHandledRestFsRequestsAction: opts?.noHandledRestFsRequestsAction ?? "404",
 				parser: opts?.parser ?? true,
-                middlewares: opts?.handlerMiddlewares ?? [],
-                errorMiddlewares: opts?.errorMiddlewares ?? [],
-                handlers: opts?.handlers ?? [],
-                wsHandlers: opts?.wsHandlers ?? [],
-                pagination: opts?.pagination ?? null,
-                filters: opts?.filters ?? null,
-                config,
-                matcher: new AntPathMatcher()
-            };
+				middlewares: opts?.handlerMiddlewares ?? [],
+				errorMiddlewares: opts?.errorMiddlewares ?? [],
+				handlers: opts?.handlers ?? [],
+				wsHandlers: opts?.wsHandlers ?? [],
+				pagination: opts?.pagination ?? null,
+				filters: opts?.filters ?? null,
+				config,
+				matcher: new AntPathMatcher()
+			};
 		},
 		/* v8 ignore start */
 		validatingOptions() {
@@ -90,42 +90,42 @@ export const Utils = {
 				: JSON.parse(JSON.stringify(obj));
 		}
 		/* v8 ignore stop */
-    },
-    files: {
-        async isDirExists(s: PathLike) {
-            try {
-                return (await stat(s)).isDirectory();
-            } catch (err: any) {
-                if (["ENOTDIR", "ENOENT"].includes(err.code)) {
-                    return false;
-                }
-                throw err;
-            }
-        },
-        async createDir(s: PathLike) {
+	},
+	files: {
+		async isDirExists(s: PathLike) {
+			try {
+				return (await stat(s)).isDirectory();
+			} catch (err: any) {
+				if (["ENOTDIR", "ENOENT"].includes(err.code)) {
+					return false;
+				}
+				throw err;
+			}
+		},
+		async createDir(s: PathLike) {
 			await mkdir(s, { recursive: true });
-        },
-        async directoryFileList(s: PathLike, options?: { encoding: BufferEncoding | null; withFileTypes?: false | undefined; recursive?: boolean | undefined; }) {
-            try {
-                return await readdir(s, options);
-            } catch (err: any) {
-                if (err.code === 'ENOTDIR') {
-                    return [];
-                }
-                throw err;
-            }
-        },
-        async isFileExists(s: PathLike) {
-            try {
-                return (await stat(s)).isFile();
-            } catch (err: any) {
-                if (err.code === 'ENOENT') {
-                    return false;
-                }
-                throw err;
-            }
-        },
-        async readingFile(s: PathLike) {
+		},
+		async directoryFileList(s: PathLike, options?: { encoding: BufferEncoding | null; withFileTypes?: false | undefined; recursive?: boolean | undefined; }) {
+			try {
+				return await readdir(s, options);
+			} catch (err: any) {
+				if (err.code === 'ENOTDIR') {
+					return [];
+				}
+				throw err;
+			}
+		},
+		async isFileExists(s: PathLike) {
+			try {
+				return (await stat(s)).isFile();
+			} catch (err: any) {
+				if (err.code === 'ENOENT') {
+					return false;
+				}
+				throw err;
+			}
+		},
+		async readingFile(s: PathLike) {
 			return await readFile(s, 'utf-8');
 		},
 		async readingStreamFile(s: PathLike) {
@@ -147,12 +147,12 @@ export const Utils = {
 			const { promise, reject, resolve } = Utils.plugin.promiseWithResolver<void>();
 			const stream = createWriteStream(s, options);
 			stream.on('error', reject);
-			stream.on('finish', ()=> resolve());
+			stream.on('finish', () => resolve());
 			stream.write(data, "utf-8");
 			stream.end();
 			return promise;
 		},
-        async writingFile(s: string, fileFound: boolean, data: any, mimeType: MimeType | null, withStream: boolean) {
+		async writingFile(s: string, fileFound: boolean, data: any, mimeType: MimeType | null, withStream: boolean) {
 			const { dir, ext } = parsePath(s);
 			let file, path = s, options = {};
 			if (!fileFound) {
@@ -177,10 +177,10 @@ export const Utils = {
 			withStream
 				? await this.writingStreamFile(path, file, options)
 				: await writeFile(path, file, options);
-        },
-        async removeFile(s: PathLike) {
+		},
+		async removeFile(s: PathLike) {
 			await unlink(s);
-        },
+		},
 		getByteLength(data: any) {
 			let value;
 			try {
@@ -190,53 +190,53 @@ export const Utils = {
 			} catch (_) {
 				value = data;
 			}
-            return Buffer.byteLength(value, "utf-8");
-        },
+			return Buffer.byteLength(value, "utf-8");
+		},
 		/* v8 ignore start */
-        isDeepEqual(objA: unknown, objB: unknown, map = new WeakMap()): boolean {
-            if (Object.is(objA, objB)) {
-                return true;
-            }
+		isDeepEqual(objA: unknown, objB: unknown, map = new WeakMap()): boolean {
+			if (Object.is(objA, objB)) {
+				return true;
+			}
 
-            if (objA instanceof Date && objB instanceof Date) {
-                return objA.getTime() === objB.getTime();
-            }
-            if (objA instanceof RegExp && objB instanceof RegExp) {
-                return objA.toString() === objB.toString();
-            }
+			if (objA instanceof Date && objB instanceof Date) {
+				return objA.getTime() === objB.getTime();
+			}
+			if (objA instanceof RegExp && objB instanceof RegExp) {
+				return objA.toString() === objB.toString();
+			}
 
-            if (
-                typeof objA !== 'object' ||
-                objA === null ||
-                typeof objB !== 'object' ||
-                objB === null
-            ) {
-                return false;
-            }
+			if (
+				typeof objA !== 'object' ||
+				objA === null ||
+				typeof objB !== 'object' ||
+				objB === null
+			) {
+				return false;
+			}
 
-            if (map.get(objA) === objB) {
-                return true;
-            }
+			if (map.get(objA) === objB) {
+				return true;
+			}
 
-            map.set(objA, objB);
+			map.set(objA, objB);
 
-            const keysA = Reflect.ownKeys(objA);
-            const keysB = Reflect.ownKeys(objB);
+			const keysA = Reflect.ownKeys(objA);
+			const keysB = Reflect.ownKeys(objB);
 
-            if (keysA.length !== keysB.length) {
-                return false;
-            }
+			if (keysA.length !== keysB.length) {
+				return false;
+			}
 
-            for (let i = 0; i < keysA.length; i++) {
-                if (
-                    !Reflect.has(objB, keysA[i]) ||
-                    !this.isDeepEqual((objA as { [key: string | symbol]: unknown })[keysA[i]], (objB as { [key: string | symbol]: unknown })[keysA[i]], map)
-                ) {
-                    return false;
-                }
-            }
+			for (let i = 0; i < keysA.length; i++) {
+				if (
+					!Reflect.has(objB, keysA[i]) ||
+					!this.isDeepEqual((objA as { [key: string | symbol]: unknown })[keysA[i]], (objB as { [key: string | symbol]: unknown })[keysA[i]], map)
+				) {
+					return false;
+				}
+			}
 
-            return true;
+			return true;
 		},
 		/* v8 ignore stop */
 		applyingPatch(data: any, patch: any, contentTypePath: "merge" | "json"): any {
@@ -283,7 +283,7 @@ export const Utils = {
 							if (Array.isArray(parent)) {
 								parent.splice(parseInt(key), 1);
 							} else {
-								if (!(key in parent)){
+								if (!(key in parent)) {
 									throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 								};
 								delete parent[key];
@@ -292,7 +292,7 @@ export const Utils = {
 						}
 						case 'replace': {
 							const { parent, key } = patchWalkPath(result, path);
-							if (!(key in parent)){
+							if (!(key in parent)) {
 								throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 							};
 							parent[key] = value;
@@ -333,34 +333,34 @@ export const Utils = {
 			}
 			return result;
 		}
-    },
-    request: {
-        addSlash(url: string, type: "leading" | "trailing" | "both") {
-            let newUrl = url;
-            if (["both", "leading"].includes(type)) {
-                !newUrl.startsWith("/") && (newUrl = "/" + newUrl);
-            }
-            if (["both", "trailing"].includes(type)) {
-                !newUrl.endsWith("/") && (newUrl += "/");
-            }
-            return newUrl;
-        },
-        removeSlash(url: string, type: "leading" | "trailing" | "both") {
-            let newUrl = url;
-            if (["both", "leading"].includes(type)) {
-                newUrl.startsWith("/") && (newUrl = newUrl.substring(1));
-            }
-            if (["both", "trailing"].includes(type)) {
-                newUrl.endsWith("/") && (newUrl = newUrl.substring(0, newUrl.length - 1));
-            }
-            return newUrl;
-        },
-        buildFullUrl(req: IncomingMessage, config: ResolvedConfig): URL {
+	},
+	request: {
+		addSlash(url: string, type: "leading" | "trailing" | "both") {
+			let newUrl = url;
+			if (["both", "leading"].includes(type)) {
+				!newUrl.startsWith("/") && (newUrl = "/" + newUrl);
+			}
+			if (["both", "trailing"].includes(type)) {
+				!newUrl.endsWith("/") && (newUrl += "/");
+			}
+			return newUrl;
+		},
+		removeSlash(url: string, type: "leading" | "trailing" | "both") {
+			let newUrl = url;
+			if (["both", "leading"].includes(type)) {
+				newUrl.startsWith("/") && (newUrl = newUrl.substring(1));
+			}
+			if (["both", "trailing"].includes(type)) {
+				newUrl.endsWith("/") && (newUrl = newUrl.substring(0, newUrl.length - 1));
+			}
+			return newUrl;
+		},
+		buildFullUrl(req: IncomingMessage, config: ResolvedConfig): URL {
 			const host = typeof config.server.host === "string"
 				? config.server.host
 				: req.headers.host ?? "localhost";
 			return new URL(req.url!, `http${config.server.https ? 's' : ''}://${host}`);
-        },
+		},
 		matchesEndpointPrefix(url: string | undefined, prefixes: string[]) {
 			if (url) {
 				const pathname = url.split("?")[0];
@@ -369,20 +369,20 @@ export const Utils = {
 				);
 			}
 			return false;
-        },
-        removeEndpointPrefix(originalUrl: string, prefixes: string[]) {
-            let url = "";
-            if (originalUrl) {
-                for (const prefix of prefixes) {
-                    if (originalUrl.startsWith(prefix)) {
-                        url = originalUrl.substring(prefix.length);
-                        break;
-                    }
-                }
-            }
-            return url;
-        },
-        async mergeBodyChunk(req: IncomingMessage): Promise<Buffer | null> {
+		},
+		removeEndpointPrefix(originalUrl: string, prefixes: string[]) {
+			let url = "";
+			if (originalUrl) {
+				for (const prefix of prefixes) {
+					if (originalUrl.startsWith(prefix)) {
+						url = originalUrl.substring(prefix.length);
+						break;
+					}
+				}
+			}
+			return url;
+		},
+		async mergeBodyChunk(req: IncomingMessage): Promise<Buffer | null> {
 			const chunks: Buffer[] = [];
 			let receiveData = false;
 			const { promise, resolve, reject } = Utils.plugin.promiseWithResolver<Buffer | null>();
@@ -453,66 +453,110 @@ export const Utils = {
 								}
 							} else if (contentType?.includes('multipart/form-data')) {
 								body = {};
-								const boundary = contentType.split("boundary=")[1];
-								const boundaryStr = `--${boundary}`;
-								const bodyString = mergedChunk.toString("binary");
-								const trimmedBody = bodyString.trimEnd();
-								const cleanBody = trimmedBody.endsWith(`${boundaryStr}--`)
-									? trimmedBody.slice(0, -2)
-									: bodyString;
+								/**
+								 * INFO
+								 * Parse multipart/form-data entirely on Buffer.
+								 */
+								const boundaryParam = contentType.split("boundary=")[1]?.split(";")[0]?.trim();
+								if (boundaryParam) {
+									const delimBuf = Buffer.from(`\r\n--${boundaryParam}`, "utf-8");
+									/**
+									 * INFO
+									 * Normalise: prepend the \r\n that RFC 2046 mandates
+									 * before every boundary delimiter so we can use a
+									 * single pattern for both the first and subsequent ones.
+									 */
+									const searchBuf = Buffer.from(`--${boundaryParam}`, "utf-8");
+									const CRLF = Buffer.from("\r\n", "utf-8");
+									const CRLFCRLF = Buffer.from("\r\n\r\n", "utf-8");
 
-								const rawParts: string[] = cleanBody.split(boundaryStr).filter((part: string) => part.trim() !== '');
-
-								rawParts.forEach(part => {
-									const divider = '\r\n\r\n';
-									const dividerIndex = part.indexOf(divider);
-									if (dividerIndex === -1) {
-										return;
+									// INFO Collect start positions of every boundary occurrence.
+									const boundaryPositions: number[] = [];
+									let searchStart = 0;
+									while (searchStart < mergedChunk.length) {
+										// INFO First delimiter has no leading \r\n
+										const pattern = boundaryPositions.length === 0 ? searchBuf : delimBuf;
+										const pos = mergedChunk.indexOf(pattern, searchStart);
+										if (pos === -1) break;
+										boundaryPositions.push(pos);
+										searchStart = pos + pattern.length;
 									}
-									const headersPart = part.substring(0, dividerIndex);
-									let bodyPartString = part.substring(dividerIndex + divider.length);
-									bodyPartString = bodyPartString.replace(/\r\n$/, "");
-									const headerLines = headersPart.trim().split("\r\n");
-									const partData: Record<string, string> = {};
-									headerLines.forEach(line => {
-										const colonIndex = line.indexOf(": ");
-										if (colonIndex !== -1) {
-											const key = line.substring(0, colonIndex);
-											const value = line.substring(colonIndex + 2);
-											partData[key.toLowerCase()] = value;
-										}
-									});
 
-									const disposition = partData["content-disposition"] || "";
-									const isFile = disposition.includes("filename=");
-
-									const partBuffer = Buffer.from(bodyPartString, "binary");
-									const name = disposition.match(/name="([^"]+)"/)?.[1];
-									const filename = disposition.match(/filename="([^"]+)"/)?.[1];
-									const partContentType = partData["content-type"] || "";
-									let finalContent: any = partBuffer;
-									// INFO JSON file are writed as JSON, text as string
-									if (partContentType.includes("application/json")) {
-										try {
-											finalContent = JSON.parse(partBuffer.toString("utf-8").trim());
-										} catch (_) {
-											finalContent = partBuffer.toString("utf-8");
+									for (let i = 0; i < boundaryPositions.length; i++) {
+										const boundaryStart = boundaryPositions[i];
+										const pattern = i === 0 ? searchBuf : delimBuf;
+										// INFO The part content begins right after the boundary line (boundary + optional \r\n)
+										let partStart = boundaryStart + pattern.length;
+										// INFO Skip the \r\n that follows the boundary token
+										if (mergedChunk.slice(partStart, partStart + 2).equals(CRLF)) {
+											partStart += 2;
+										} else {
+											// INFO "--" suffix → closing boundary, no more parts
+											continue;
 										}
-									} else if (partContentType.includes("text/") || !isFile) {
-										finalContent = partBuffer.toString("utf-8");
-									}
-									if (isFile) {
-										!files && (files = []);
-										files.push({
-											name: filename!,
-											content: finalContent,
-											contentType: partContentType || "application/octet-stream"
+
+										// INFO Part ends at next boundary position (or end of buffer)
+										const partEnd = i + 1 < boundaryPositions.length
+											? boundaryPositions[i + 1]
+											: mergedChunk.length;
+
+										const partBuf = mergedChunk.slice(partStart, partEnd);
+
+										// INFO Split headers from body on the first \r\n\r\n
+										const headerEndIdx = partBuf.indexOf(CRLFCRLF);
+										if (headerEndIdx === -1) continue;
+
+										const headersStr = partBuf.slice(0, headerEndIdx).toString("utf-8");
+										/**
+										 * INFO
+										 * Body is everything after the \r\n\r\n separator;
+										 * strip the trailing \r\n that belongs to the next boundary prefix
+										 */
+										let bodyEnd = partBuf.length;
+										if (partBuf.slice(bodyEnd - 2).equals(CRLF)) {
+											bodyEnd -= 2;
+										}
+										const bodyPartBuf = partBuf.slice(headerEndIdx + CRLFCRLF.length, bodyEnd);
+
+										const partData: Record<string, string> = {};
+										headersStr.split("\r\n").forEach(line => {
+											const colonIndex = line.indexOf(": ");
+											if (colonIndex !== -1) {
+												partData[line.substring(0, colonIndex).toLowerCase()] =
+													line.substring(colonIndex + 2);
+											}
 										});
-									} else {
-										(body as Record<string, any>)[name ?? ''] = finalContent;
-										buildBody = true;
+
+										const disposition = partData["content-disposition"] || "";
+										const isFile = disposition.includes("filename=");
+										const name = disposition.match(/name="([^"]+)"/)?.[1];
+										const filename = disposition.match(/filename="([^"]+)"/)?.[1];
+										const partContentType = partData["content-type"] || "";
+
+										let finalContent: any = bodyPartBuf;
+										if (partContentType.includes("application/json")) {
+											try {
+												finalContent = JSON.parse(bodyPartBuf.toString("utf-8").trim());
+											} catch (_) {
+												finalContent = bodyPartBuf.toString("utf-8");
+											}
+										} else if (partContentType.includes("text/") || !isFile) {
+											finalContent = bodyPartBuf.toString("utf-8");
+										}
+
+										if (isFile) {
+											!files && (files = []);
+											files.push({
+												name: filename!,
+												content: finalContent,
+												contentType: partContentType || "application/octet-stream"
+											});
+										} else {
+											(body as Record<string, any>)[name ?? ''] = finalContent;
+											buildBody = true;
+										}
 									}
-								});
+								}
 							} else {
 								let parsed;
 								buildBody = true;
@@ -542,12 +586,12 @@ export const Utils = {
 			} finally {
 				!!parserRequest && logger.debug("parseRequest: END");
 			}
-        },
-        MiddlewaresChain() {
-            const middlewares: UniversalApiMiddleware[] = [];
-            const errorMiddlewares: UniversalApiErrorMiddleware[] = [];
+		},
+		MiddlewaresChain() {
+			const middlewares: UniversalApiMiddleware[] = [];
+			const errorMiddlewares: UniversalApiErrorMiddleware[] = [];
 
-            function use(m: UniversalApiMiddleware[], me: UniversalApiErrorMiddleware[]) {
+			function use(m: UniversalApiMiddleware[], me: UniversalApiErrorMiddleware[]) {
 				middlewares.push(...m.filter(m => m !== null));
 				errorMiddlewares.push(...me.filter(me => me !== null));
 			}
@@ -593,11 +637,11 @@ export const Utils = {
 				await handle(req, res, error);
 			}
 
-            return {
+			return {
 				handle,
 				handleError,
-                use
-            };
+				use
+			};
 		},
 		hasPaginationOrFilters(method: UniversalApiRequest<any>["method"], paginationPlugin: UniversalApiOptionsRequired["pagination"], filterPlugin: UniversalApiOptionsRequired["filters"], paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"]) {
 			return (!!paginationHandler && paginationHandler !== "none")
@@ -605,16 +649,16 @@ export const Utils = {
 				|| (paginationPlugin !== null && (method! in paginationPlugin || "ALL" in paginationPlugin))
 				|| (filterPlugin !== null && (method! in filterPlugin || "ALL" in filterPlugin))
 		},
-        getPaginationAndFilters(request: UniversalApiRequest<any>, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"]): { pagination: null | { limit: null | number, skip: null | number, sort: null | string, order: null | string }, filters: null | { key: string, value: any, comparison: string, regexFlags?: string }[] } {
-            const result: { pagination: null | { limit: null | number, skip: null | number, sort: null | string, order: null | string }, filters: null | { key: string, value: any, comparison: string, regexFlags?: string }[] } = {
-                pagination: null,
+		getPaginationAndFilters(request: UniversalApiRequest<any>, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"]): { pagination: null | { limit: null | number, skip: null | number, sort: null | string, order: null | string }, filters: null | { key: string, value: any, comparison: string, regexFlags?: string }[] } {
+			const result: { pagination: null | { limit: null | number, skip: null | number, sort: null | string, order: null | string }, filters: null | { key: string, value: any, comparison: string, regexFlags?: string }[] } = {
+				pagination: null,
 				filters: null
-            }
-            let pagPlugin: typeof result.pagination = null;
-            let filtPlugin: typeof result.filters = null;
-            if (!!paginationPlugin && (request.method! in paginationPlugin || "ALL" in paginationPlugin && ["HEAD", "GET", "POST", "DELETE"].includes(request.method!))) {
-                const pag = request.method! in paginationPlugin
-                    ? paginationPlugin[request.method! as keyof typeof paginationPlugin]
+			}
+			let pagPlugin: typeof result.pagination = null;
+			let filtPlugin: typeof result.filters = null;
+			if (!!paginationPlugin && (request.method! in paginationPlugin || "ALL" in paginationPlugin && ["HEAD", "GET", "POST", "DELETE"].includes(request.method!))) {
+				const pag = request.method! in paginationPlugin
+					? paginationPlugin[request.method! as keyof typeof paginationPlugin]
 					: paginationPlugin.ALL;
 				const limit = pag?.limit
 					? pag.type === "query-param"
@@ -692,61 +736,61 @@ export const Utils = {
 						order
 					}
 				}
-            }
-            if (!!filtersPlugin && (request.method! in filtersPlugin || "ALL" in filtersPlugin && ["HEAD", "GET", "POST", "DELETE"].includes(request.method!))) {
-                const filts = request.method! in filtersPlugin
-                    ? filtersPlugin[request.method! as keyof typeof filtersPlugin]
+			}
+			if (!!filtersPlugin && (request.method! in filtersPlugin || "ALL" in filtersPlugin && ["HEAD", "GET", "POST", "DELETE"].includes(request.method!))) {
+				const filts = request.method! in filtersPlugin
+					? filtersPlugin[request.method! as keyof typeof filtersPlugin]
 					: filtersPlugin.ALL;
-                filts && filts.filters.forEach(filt => {
-                    let value: any = filts.type === "query-param"
-                        ? request.query.get(filt.key)
-                        : filts.root && filts.root in request.body
-                            ? filt.key in request.body[filts.root]
-                                ? request.body[filts.root][filt.key]
-                                : null
-                            : filt.key in request.body
-                                ? request.body[filt.key]
-                                : null
-                        ;
-                    if (value != null) {
-                        if (typeof filt.valueType === "string") {
-                            switch (filt.valueType) {
-                                case "string":
-                                    break;
-                                case "boolean":
-                                    value = !["false", "0", false].includes(value);
-                                    break;
-                                case "number":
-                                    value = Number(value);
-                                    break;
-                                case "date":
-                                    value = new Date(value);
-                                    break;
-                                case "string[]":
-                                    value = value.split(",");
-                                    break;
-                                case "boolean[]":
-                                    value = value.split(",").map((el: string) => !["false", "0"].includes(el));
-                                    break;
-                                case "number[]":
-                                    value = value.split(",").map((el: string) => Number(el));
-                                    break;
-                                case "date[]":
-                                    value = value.split(",").map((el: string) => new Date(el));
-                                    break;
-                            }
-                        } else {
-                            value = filt.valueType(value);
+				filts && filts.filters.forEach(filt => {
+					let value: any = filts.type === "query-param"
+						? request.query.get(filt.key)
+						: filts.root && filts.root in request.body
+							? filt.key in request.body[filts.root]
+								? request.body[filts.root][filt.key]
+								: null
+							: filt.key in request.body
+								? request.body[filt.key]
+								: null
+						;
+					if (value != null) {
+						if (typeof filt.valueType === "string") {
+							switch (filt.valueType) {
+								case "string":
+									break;
+								case "boolean":
+									value = !["false", "0", false].includes(value);
+									break;
+								case "number":
+									value = Number(value);
+									break;
+								case "date":
+									value = new Date(value);
+									break;
+								case "string[]":
+									value = value.split(",");
+									break;
+								case "boolean[]":
+									value = value.split(",").map((el: string) => !["false", "0"].includes(el));
+									break;
+								case "number[]":
+									value = value.split(",").map((el: string) => Number(el));
+									break;
+								case "date[]":
+									value = value.split(",").map((el: string) => new Date(el));
+									break;
+							}
+						} else {
+							value = filt.valueType(value);
 						}
 						filtPlugin === null && (filtPlugin = []);
-                        filtPlugin!.push({
-                            key: `${filts.root ? filts.root + "." : ""}${filt.key}`,
-                            value,
-                            comparison: filt.comparison,
-                            ...(filt.regexFlags ? { regexFlags: filt.regexFlags } : {})
-                        });
-                    }
-                });
+						filtPlugin!.push({
+							key: `${filts.root ? filts.root + "." : ""}${filt.key}`,
+							value,
+							comparison: filt.comparison,
+							...(filt.regexFlags ? { regexFlags: filt.regexFlags } : {})
+						});
+					}
+				});
 			}
 			if (paginationHandler !== "none") {
 				if (paginationHandler) {
@@ -846,7 +890,7 @@ export const Utils = {
 				}
 			}
 
-            if (filtersHandler !== "none") {
+			if (filtersHandler !== "none") {
 				if (filtersHandler) {
 					const exclIncl = filtersHandler.exclusive ? "exclusive" : "inclusive" as keyof typeof filtersHandler;
 					const filters: typeof result.filters = [];
@@ -895,7 +939,7 @@ export const Utils = {
 								key: `${filtersHandler[exclIncl]?.root ? filtersHandler[exclIncl].root + "." : ""}${filt.key}`,
 								value,
 								comparison: filt.comparison,
-								...(filt.regexFlags ? {regexFlags: filt.regexFlags} : {})
+								...(filt.regexFlags ? { regexFlags: filt.regexFlags } : {})
 							});
 						}
 					});
@@ -909,10 +953,10 @@ export const Utils = {
 				} else {
 					filtPlugin !== null && (result.filters = filtPlugin);
 				}
-            }
-            return result;
+			}
+			return result;
 		},
-		applyPaginationAndFilters(request: UniversalApiRequest<any>, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"], dataFile: { originalData: any, data: any, mimeType: string, total: number}) {
+		applyPaginationAndFilters(request: UniversalApiRequest<any>, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"], dataFile: { originalData: any, data: any, mimeType: string, total: number }) {
 			const data = JSON.parse(dataFile.data);
 			dataFile.originalData = JSON.parse(dataFile.data);
 			dataFile.data = data;
@@ -1004,106 +1048,106 @@ export const Utils = {
 			}
 			dataFile.total = Array.isArray(dataFile.data) ? dataFile.data.length : dataFile.data === null ? 0 : 1;
 		},
-        getCleanBody(requestMethod: string | undefined, body: any, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"]): any {
-            // INFO This method is only used when the request body is present and is of type JSON.
+		getCleanBody(requestMethod: string | undefined, body: any, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"]): any {
+			// INFO This method is only used when the request body is present and is of type JSON.
 			if (Array.isArray(body)) {
-                let newBody: any = [];
-                body.forEach(elem => {
-                    const keys = Reflect.ownKeys(elem);
+				let newBody: any = [];
+				body.forEach(elem => {
+					const keys = Reflect.ownKeys(elem);
 					const keysToExclude = [];
 					const IS_PAG_EXCLUSIVE = paginationHandler && paginationHandler !== "none" && "exclusive" in paginationHandler && paginationHandler.exclusive?.type === "body";
 					const IS_FILT_EXCLUSIVE = filtersHandler && filtersHandler !== "none" && "exclusive" in filtersHandler && filtersHandler.exclusive?.type === "body";
-                    if (paginationHandler && paginationHandler !== "none" && (paginationHandler?.exclusive || paginationHandler?.inclusive)?.type === "body") {
+					if (paginationHandler && paginationHandler !== "none" && (paginationHandler?.exclusive || paginationHandler?.inclusive)?.type === "body") {
 						const exclIncl = paginationHandler?.exclusive ? "exclusive" : "inclusive";
 						paginationHandler[exclIncl]?.root && paginationHandler[exclIncl].root in elem && keysToExclude.push(paginationHandler[exclIncl].root);
 						!paginationHandler[exclIncl]?.root && paginationHandler[exclIncl]?.limit && paginationHandler[exclIncl].limit in elem && keysToExclude.push(paginationHandler[exclIncl].limit);
 						!paginationHandler[exclIncl]?.root && paginationHandler[exclIncl]?.skip && paginationHandler[exclIncl].skip in elem && keysToExclude.push(paginationHandler[exclIncl].skip);
 						!paginationHandler[exclIncl]?.root && paginationHandler[exclIncl]?.sort && paginationHandler[exclIncl].sort in elem && keysToExclude.push(paginationHandler[exclIncl].sort);
 						!paginationHandler[exclIncl]?.root && paginationHandler[exclIncl]?.order && paginationHandler[exclIncl].order in elem && keysToExclude.push(paginationHandler[exclIncl].order);
-                    }
-                    if (!IS_PAG_EXCLUSIVE && paginationPlugin && (paginationPlugin[requestMethod! as keyof typeof paginationPlugin] || paginationPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!))) {
-                        const pag = requestMethod && requestMethod in paginationPlugin ? paginationPlugin[requestMethod as keyof typeof paginationPlugin] : paginationPlugin.ALL;
-                        if (pag?.type === "body") {
-                            pag.root && pag.root in elem && keysToExclude.push(pag.root);
-                            !pag.root && pag.limit && pag.limit in elem && keysToExclude.push(pag.limit);
-                            !pag.root && pag.skip && pag.skip in elem && keysToExclude.push(pag.skip);
-                            !pag.root && pag.sort && pag.sort in elem && keysToExclude.push(pag.sort);
-                            !pag.root && pag.order && pag.order in elem && keysToExclude.push(pag.order);
-                        }
-                    }
-                    if (filtersHandler && filtersHandler !== "none" && ((filtersHandler?.exclusive || filtersHandler?.inclusive)?.filters || []).length > 0) {
+					}
+					if (!IS_PAG_EXCLUSIVE && paginationPlugin && (paginationPlugin[requestMethod! as keyof typeof paginationPlugin] || paginationPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!))) {
+						const pag = requestMethod && requestMethod in paginationPlugin ? paginationPlugin[requestMethod as keyof typeof paginationPlugin] : paginationPlugin.ALL;
+						if (pag?.type === "body") {
+							pag.root && pag.root in elem && keysToExclude.push(pag.root);
+							!pag.root && pag.limit && pag.limit in elem && keysToExclude.push(pag.limit);
+							!pag.root && pag.skip && pag.skip in elem && keysToExclude.push(pag.skip);
+							!pag.root && pag.sort && pag.sort in elem && keysToExclude.push(pag.sort);
+							!pag.root && pag.order && pag.order in elem && keysToExclude.push(pag.order);
+						}
+					}
+					if (filtersHandler && filtersHandler !== "none" && ((filtersHandler?.exclusive || filtersHandler?.inclusive)?.filters || []).length > 0) {
 						const filters = (filtersHandler.inclusive || filtersHandler.exclusive);
 						filters && filters.filters.forEach(filter => {
-                            if (filters.type === "body") {
-                                filters.root && filters.root in elem && keysToExclude.push(filters.root);
-                                !filters.root && filter.key && filter.key in elem && keysToExclude.push(filter.key);
-                            }
-                        })
-                    }
-                    if (!IS_FILT_EXCLUSIVE && filtersPlugin && (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || filtersPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!))) {
+							if (filters.type === "body") {
+								filters.root && filters.root in elem && keysToExclude.push(filters.root);
+								!filters.root && filter.key && filter.key in elem && keysToExclude.push(filter.key);
+							}
+						})
+					}
+					if (!IS_FILT_EXCLUSIVE && filtersPlugin && (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || filtersPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!))) {
 						const filters = (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || filtersPlugin.ALL);
 						filters && filters.filters.forEach(filter => {
-                            if (filters.type === "body") {
-                                filters.root && filters.root in elem && keysToExclude.push(filters.root);
-                                !filters.root && filter.key && filter.key in elem && keysToExclude.push(filter.key);
-                            }
-                        })
-                    }
-                    const newElem = {};
-                    for (const key of keys) {
-                        !keysToExclude.includes(key as string) && Reflect.set(newElem, key, Reflect.get(elem, key));
-                    }
-                    Reflect.ownKeys(newElem).length > 0 && newBody.push(newElem);
-                });
-                newBody.length === 0 && (newBody = null);
-                return newBody;
-            }
-            if (typeof body === "object") {
-                let newBody: any = {};
-                const keys = Reflect.ownKeys(body);
-                const keysToExclude = [];
-                if (paginationHandler && paginationHandler !== "none" && (paginationHandler?.exclusive || paginationHandler?.inclusive)?.type === "body") {
-                    const exclIncl = paginationHandler["exclusive" ] || paginationHandler["inclusive"];
-                    exclIncl?.root && exclIncl?.root in body && keysToExclude.push(exclIncl?.root);
-                    !exclIncl?.root && exclIncl?.limit && exclIncl?.limit in body && keysToExclude.push(exclIncl?.limit);
-                    !exclIncl?.root && exclIncl?.skip && exclIncl?.skip in body && keysToExclude.push(exclIncl?.skip);
-                    !exclIncl?.root && exclIncl?.sort && exclIncl?.sort in body && keysToExclude.push(exclIncl?.sort);
-                    !exclIncl?.root && exclIncl?.order && exclIncl?.order in body && keysToExclude.push(exclIncl?.order);
-                }
-                if (paginationPlugin && (paginationPlugin[requestMethod! as keyof typeof paginationPlugin] || paginationPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!))) {
-                    const pag = requestMethod && requestMethod in paginationPlugin ? paginationPlugin[requestMethod as keyof typeof paginationPlugin] : paginationPlugin.ALL;
-                    if (pag?.type === "body") {
-                        pag.root && pag.root in body && keysToExclude.push(pag.root);
-                        !pag.root && pag.limit && pag.limit in body && keysToExclude.push(pag.limit);
-                        !pag.root && pag.skip && pag.skip in body && keysToExclude.push(pag.skip);
-                        !pag.root && pag.sort && pag.sort in body && keysToExclude.push(pag.sort);
-                        !pag.root && pag.order && pag.order in body && keysToExclude.push(pag.order);
-                    }
-                }
-                if (filtersHandler && filtersHandler !== "none" && ((filtersHandler?.exclusive || filtersHandler?.inclusive)?.filters || []).length > 0) {
+							if (filters.type === "body") {
+								filters.root && filters.root in elem && keysToExclude.push(filters.root);
+								!filters.root && filter.key && filter.key in elem && keysToExclude.push(filter.key);
+							}
+						})
+					}
+					const newElem = {};
+					for (const key of keys) {
+						!keysToExclude.includes(key as string) && Reflect.set(newElem, key, Reflect.get(elem, key));
+					}
+					Reflect.ownKeys(newElem).length > 0 && newBody.push(newElem);
+				});
+				newBody.length === 0 && (newBody = null);
+				return newBody;
+			}
+			if (typeof body === "object") {
+				let newBody: any = {};
+				const keys = Reflect.ownKeys(body);
+				const keysToExclude = [];
+				if (paginationHandler && paginationHandler !== "none" && (paginationHandler?.exclusive || paginationHandler?.inclusive)?.type === "body") {
+					const exclIncl = paginationHandler["exclusive"] || paginationHandler["inclusive"];
+					exclIncl?.root && exclIncl?.root in body && keysToExclude.push(exclIncl?.root);
+					!exclIncl?.root && exclIncl?.limit && exclIncl?.limit in body && keysToExclude.push(exclIncl?.limit);
+					!exclIncl?.root && exclIncl?.skip && exclIncl?.skip in body && keysToExclude.push(exclIncl?.skip);
+					!exclIncl?.root && exclIncl?.sort && exclIncl?.sort in body && keysToExclude.push(exclIncl?.sort);
+					!exclIncl?.root && exclIncl?.order && exclIncl?.order in body && keysToExclude.push(exclIncl?.order);
+				}
+				if (paginationPlugin && (paginationPlugin[requestMethod! as keyof typeof paginationPlugin] || paginationPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!))) {
+					const pag = requestMethod && requestMethod in paginationPlugin ? paginationPlugin[requestMethod as keyof typeof paginationPlugin] : paginationPlugin.ALL;
+					if (pag?.type === "body") {
+						pag.root && pag.root in body && keysToExclude.push(pag.root);
+						!pag.root && pag.limit && pag.limit in body && keysToExclude.push(pag.limit);
+						!pag.root && pag.skip && pag.skip in body && keysToExclude.push(pag.skip);
+						!pag.root && pag.sort && pag.sort in body && keysToExclude.push(pag.sort);
+						!pag.root && pag.order && pag.order in body && keysToExclude.push(pag.order);
+					}
+				}
+				if (filtersHandler && filtersHandler !== "none" && ((filtersHandler?.exclusive || filtersHandler?.inclusive)?.filters || []).length > 0) {
 					const filters = (filtersHandler.inclusive || filtersHandler.exclusive);
 					filters && filters.filters.forEach(filter => {
-                        if (filters.type === "body") {
-                            filters.root && filters.root in body && keysToExclude.push(filters.root);
-                            !filters.root && filter.key && filter.key in body && keysToExclude.push(filter.key);
-                        }
-                    })
-                }
-                if (filtersPlugin && (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || filtersPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!))) {
+						if (filters.type === "body") {
+							filters.root && filters.root in body && keysToExclude.push(filters.root);
+							!filters.root && filter.key && filter.key in body && keysToExclude.push(filter.key);
+						}
+					})
+				}
+				if (filtersPlugin && (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || filtersPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!))) {
 					const filters = (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || filtersPlugin.ALL);
 					filters && filters.filters.forEach(filter => {
-                        if (filters.type === "body") {
-                            filters.root && filters.root in body && keysToExclude.push(filters.root);
-                            !filters.root && filter.key && filter.key in body && keysToExclude.push(filter.key);
-                        }
-                    })
-                }
-                for (const key of keys) {
-                    !keysToExclude.includes(key as string) && Reflect.set(newBody, key, Reflect.get(body, key));
-                }
-                Reflect.ownKeys(newBody).length === 0 && (newBody = null);
-                return newBody;
-            }
+						if (filters.type === "body") {
+							filters.root && filters.root in body && keysToExclude.push(filters.root);
+							!filters.root && filter.key && filter.key in body && keysToExclude.push(filter.key);
+						}
+					})
+				}
+				for (const key of keys) {
+					!keysToExclude.includes(key as string) && Reflect.set(newBody, key, Reflect.get(body, key));
+				}
+				Reflect.ownKeys(newBody).length === 0 && (newBody = null);
+				return newBody;
+			}
 		},
 		/* v8 ignore start */
 		getBodyOtherData(originalBody: any, bodyClean: any, contentType: string) {
@@ -1133,7 +1177,7 @@ export const Utils = {
 			}
 			return body !== null && body !== undefined && (Array.isArray(body) || typeof body === 'object');
 		}
-    },
+	},
 	response: {
 		NO_RESPONSE: Symbol("NO_RESPONSE"),
 		async sendStreamFile(res: ServerResponse, data: ApiWsRestFsDataResponse) {
@@ -1157,7 +1201,7 @@ export const Utils = {
 			stream.pipe(res);
 			return promise;
 		},
-        async settingResponse(logger: ILogger, res: ServerResponse, data: ApiWsRestFsDataResponse) {
+		async settingResponse(logger: ILogger, res: ServerResponse, data: ApiWsRestFsDataResponse) {
 			logger.debug(`settingResponse: START`);
 			try {
 				const { promise, reject, resolve } = Utils.plugin.promiseWithResolver();
@@ -1206,7 +1250,7 @@ export const Utils = {
 								responseData.data = this.NO_RESPONSE;
 								responseData.headers = [
 									...responseData.headers,
-									{"name": "content-length", value: 0}
+									{ "name": "content-length", value: 0 }
 								]
 							} else {
 								responseData.data = JSON.stringify(responseData.data);
@@ -1282,6 +1326,6 @@ export const Utils = {
 			} finally {
 				logger.debug(`settingResponse: END`);
 			}
-        }
+		}
 	}
 }
