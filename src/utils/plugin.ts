@@ -196,8 +196,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 								Utils.request.applyPaginationAndFilters(request, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin, dataFile);
 							} catch (error: any) {
 								if (error instanceof UniversalApiError) {
-									if (error.getType() === "MANUALLY_HANDLED") {
-										error.setType("ERROR");
+									if (!error.getPath()) {
 										error.setPath(fullUrl.pathname);
 									}
 									throw error;
@@ -271,8 +270,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 								Utils.request.applyPaginationAndFilters(request, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin, dataFile);
 							} catch (error: any) {
 								if (error instanceof UniversalApiError) {
-									if (error.getType() === "MANUALLY_HANDLED") {
-										error.setType("ERROR");
+									if (!error.getPath()) {
 										error.setPath(fullUrl.pathname);
 									}
 									throw error;
@@ -376,8 +374,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 					await Utils.files.writingFile(file, fileFound, newData, dataFile.mimeType, true);
 				} catch (error: any) {
 					if (error instanceof UniversalApiError) {
-						if (error.getType() === "MANUALLY_HANDLED") {
-							error.setType("ERROR");
+						if (!error.getPath()) {
 							error.setPath(fullUrl.pathname);
 						}
 						throw error;
@@ -412,8 +409,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 							}
 						} catch (error: any) {
 							if (error instanceof UniversalApiError) {
-								if (error.getType() === "MANUALLY_HANDLED") {
-									error.setType("ERROR");
+								if (!error.getPath()) {
 									error.setPath(fullUrl.pathname);
 								}
 								throw error;

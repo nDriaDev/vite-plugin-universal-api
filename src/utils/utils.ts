@@ -15,7 +15,7 @@ function patchWalkPath(target: any, path: string) {
 	if (path === '' || path === '/') {
 		throw new UniversalApiError(
 			"PATCH body request malformed: cannot use root path for this operation",
-			"MANUALLY_HANDLED",
+			"ERROR",
 			"",
 			Constants.HTTP_STATUS_CODE.BAD_REQUEST
 		);
@@ -26,7 +26,7 @@ function patchWalkPath(target: any, path: string) {
 	for (let i = 0; i < segments.length - 1; i++) {
 		const key = segments[i];
 		if (!(key in current)) {
-			throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+			throw new UniversalApiError("PATCH body request malformed", "ERROR", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 		}
 		current = current[key];
 	}
@@ -270,13 +270,13 @@ export const Utils = {
 			} else {
 				// INFO RFC 6902 standard (JSON Patch)
 				if (!Array.isArray(patch)) {
-					throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+					throw new UniversalApiError("PATCH body request malformed", "ERROR", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 				}
 				result = Utils.plugin.cloneData(data);
 				patch.forEach(operation => {
 					const { op, path, value, from } = operation;
 					if (!op || !path) {
-						throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+						throw new UniversalApiError("PATCH body request malformed", "ERROR", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 					}
 					switch (op) {
 						case 'add': {
@@ -295,7 +295,7 @@ export const Utils = {
 								parent.splice(parseInt(key), 1);
 							} else {
 								if (!(key in parent)) {
-									throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+									throw new UniversalApiError("PATCH body request malformed", "ERROR", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 								};
 								delete parent[key];
 							}
@@ -304,7 +304,7 @@ export const Utils = {
 						case 'replace': {
 							const { parent, key } = patchWalkPath(result, path);
 							if (!(key in parent)) {
-								throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+								throw new UniversalApiError("PATCH body request malformed", "ERROR", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 							};
 							parent[key] = value;
 							break;
@@ -338,7 +338,7 @@ export const Utils = {
 							break;
 						}
 						default:
-							throw new UniversalApiError(`PATCH operation not supported: ${op}`, "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+							throw new UniversalApiError(`PATCH operation not supported: ${op}`, "ERROR", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 					}
 				})
 			}
@@ -1038,7 +1038,7 @@ export const Utils = {
 				if (pagination !== null && Array.isArray(dataFile.data)) {
 					if (pagination.sort !== null && pagination.order !== null) {
 						if (!["ASC", "DESC", "1", "-1", "true", "false"].includes(pagination.order)) {
-							throw new UniversalApiError("Error parsing pagination request", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+							throw new UniversalApiError("Error parsing pagination request", "ERROR", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 						}
 						dataFile.data = dataFile.data.sort((a: any, b: any) => {
 							return ["ASC", "1", "true"].includes(pagination.order!)
