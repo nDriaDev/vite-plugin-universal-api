@@ -28,7 +28,9 @@ function patchWalkPath(target: any, path: string) {
 }
 
 function patchGetValue(obj: any, path: string) {
-	if (path === '' || path === '/') return obj;
+	if (path === '' || path === '/') {
+		return obj;
+	}
 	const { parent, key } = patchWalkPath(obj, path);
 	return parent[key];
 }
