@@ -107,8 +107,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 			} else {
 				pathname = handler.preHandle.transform(pathname);
 			}
-			fullUrl.pathname = pathname;
-			url = fullUrl.pathname + fullUrl.search;
+			url = pathname + fullUrl.search;
 		}
 
 		const endpointNoPrefix = Utils.request.removeSlash(Utils.request.removeEndpointPrefix(url, endpointPrefix), "trailing");
