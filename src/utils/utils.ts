@@ -1277,10 +1277,13 @@ export const Utils = {
 						try {
 							if ([null, undefined].includes(responseData.data)) {
 								responseData.data = this.NO_RESPONSE;
-								responseData.headers = [
-									...responseData.headers,
-									{ "name": "content-length", value: 0 }
-								]
+								const hasContentLength = responseData.headers.some(h => h.name.toLowerCase() === "content-length");
+								if (!hasContentLength) {
+									responseData.headers = [
+										...responseData.headers,
+										{ "name": "content-length", value: 0 }
+									];
+								}
 							} else {
 								responseData.data = JSON.stringify(responseData.data);
 							}
