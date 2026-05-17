@@ -403,8 +403,8 @@ export const Utils = {
 				chunks.push(chunk);
 			});
 
-			req.on("error", () => {
-				reject(new Error("Error parsing request body"));
+			req.on("error", (err: Error) => {
+				reject(err);
 			});
 
 			req.on("end", () => {
@@ -598,7 +598,7 @@ export const Utils = {
 				}
 			} catch (error: any) {
 				logger.debug("parseRequest: ERROR - ", error);
-				throw new UniversalApiError("Error parsing request", "ERROR", fullUrl.pathname);
+				throw new UniversalApiError(error instanceof Error ? error : new Error(String(error)), "ERROR", fullUrl.pathname);
 			} finally {
 				!!parserRequest && logger.debug("parseRequest: END");
 			}
