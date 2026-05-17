@@ -173,7 +173,7 @@ export const Utils = {
 				const extFile = MimeTypeExt[mimeType];
 				path += `${extFile ? extFile : typeof data === "string" ? ".txt" : ""}`;
 			}
-			if (mimeType != null && mimeType.toString() === MimeType[".json"] || !!ext && ext === MimeTypeExt["application/json"]) {
+			if ((mimeType != null && mimeType.toString() === MimeType[".json"]) || (!!ext && ext === MimeTypeExt["application/json"])) {
 				file = JSON.stringify(data, null, 2);
 				options = { encoding: "utf-8" };
 			} else {
