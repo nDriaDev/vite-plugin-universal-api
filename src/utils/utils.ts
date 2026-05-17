@@ -351,10 +351,10 @@ export const Utils = {
 		removeSlash(url: string, type: "leading" | "trailing" | "both") {
 			let newUrl = url;
 			if (["both", "leading"].includes(type)) {
-				newUrl.startsWith("/") && (newUrl = newUrl.substring(1));
+				newUrl = newUrl.replace(/^\/+/, "");
 			}
 			if (["both", "trailing"].includes(type)) {
-				newUrl.endsWith("/") && (newUrl = newUrl.substring(0, newUrl.length - 1));
+				newUrl = newUrl.replace(/\/+$/, "");
 			}
 			return newUrl;
 		},
