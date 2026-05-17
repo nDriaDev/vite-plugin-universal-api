@@ -309,7 +309,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 						if (HAS_PAG_OR_FILT) {
 							throw new UniversalApiError(`No data to filter or to paginate`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 						}
-						result.status = Constants.HTTP_STATUS_CODE.OK;
+						result.status = Constants.HTTP_STATUS_CODE.CREATED;
 						writeFile = currentContent;
 					}
 					if (writeFile !== -1) {
