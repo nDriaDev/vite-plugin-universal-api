@@ -12,6 +12,9 @@ import { UniversalApiError } from "./Error";
 import { ILogger } from "../models/logger.model";
 
 function patchWalkPath(target: any, path: string) {
+	if (path === '' || path === '/') {
+		return target;
+	}
 	const segments = path.split('/').filter(s => s !== '');
 	let current = target;
 
@@ -653,7 +656,7 @@ export const Utils = {
 		},
 		hasPaginationOrFilters(method: UniversalApiRequest<any>["method"], paginationPlugin: UniversalApiOptionsRequired["pagination"], filterPlugin: UniversalApiOptionsRequired["filters"], paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"]) {
 			return (!!paginationHandler && paginationHandler !== "none")
-				|| (!!filtersHandler && filtersHandler !== null)
+				|| (!!filtersHandler && filtersHandler !== "none")
 				|| (paginationPlugin !== null && (method! in paginationPlugin || "ALL" in paginationPlugin))
 				|| (filterPlugin !== null && (method! in filterPlugin || "ALL" in filterPlugin))
 		},
