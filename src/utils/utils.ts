@@ -13,7 +13,12 @@ import { ILogger } from "../models/logger.model";
 
 function patchWalkPath(target: any, path: string) {
 	if (path === '' || path === '/') {
-		return target;
+		throw new UniversalApiError(
+			"PATCH body request malformed: cannot use root path for this operation",
+			"MANUALLY_HANDLED",
+			"",
+			Constants.HTTP_STATUS_CODE.BAD_REQUEST
+		);
 	}
 	const segments = path.split('/').filter(s => s !== '');
 	let current = target;
