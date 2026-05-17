@@ -670,6 +670,7 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 						break;
 					case "MANUALLY_HANDLED":
 						dataResponse.data = `${error.message} Handled request did not send any response`;
+						dataResponse.errorMiddlewares = undefined;
 						break;
 					case "ERROR":
 						dataResponse.status = error.getCode();
@@ -996,7 +997,11 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 				if (!connection.closed) {
 					connection.markClosed();
 					if (currentHandler.onClose) {
-						await currentHandler.onClose(connection, code, reason.toString() || "", true);
+						try {
+							await currentHandler.onClose(connection, code, reason.toString() || "", true);
+						} catch (err: any) {
+							logger.error(`runWsPlugin: error in onClose handler for ${connection.id}: `, err);
+						}
 					}
 					manager.remove(connection.id);
 				}
