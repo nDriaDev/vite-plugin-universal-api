@@ -403,6 +403,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 				result.status = Constants.HTTP_STATUS_CODE.NO_CONTENT;
 				try {
 					let removeFile = true;
+					let deletedCount = 1;
 					if (dataFile.mimeType === MimeType[".json"] && Utils.request.hasPaginationOrFilters(request.method, paginationPlugin, filtersPlugin, paginationHandler, filtersHandler)) {
 						try {
 							logger.debug("handlingApiFsRequest: applying pagination and filters");
@@ -437,12 +438,14 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 									name: Constants.DELETED_ELEMENTS_HEADER,
 									value: dataFile.originalData.length - newData.length
 								});
+							} else {
+								deletedCount = dataFile.originalData.length;
 							}
 						}
 					}
 					if (removeFile) {
 						await Utils.files.removeFile(file);
-						result.headers.push({ name: Constants.DELETED_ELEMENTS_HEADER, value: 1 });
+						result.headers.push({ name: Constants.DELETED_ELEMENTS_HEADER, value: deletedCount });
 					}
 				} catch (error) {
 					if (error instanceof UniversalApiError) {
