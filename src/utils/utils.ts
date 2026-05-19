@@ -369,7 +369,7 @@ export const Utils = {
 		buildFullUrl(req: IncomingMessage, config: ResolvedConfig): URL {
 			const host = req.headers.host ?? (
 				typeof config.server.host === "string"
-				? config.server.host
+					? config.server.host
 					: "localhost"
 			);
 			return new URL(req.url!, `http${config.server.https ? 's' : ''}://${host}`);
@@ -1336,6 +1336,10 @@ export const Utils = {
 					}
 				}
 				if (res.writableEnded) {
+					return Promise.resolve(null);
+				}
+				if (res.headersSent) {
+					res.end();
 					return Promise.resolve(null);
 				}
 				res.statusCode = responseData.status;
