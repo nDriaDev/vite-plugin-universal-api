@@ -99,15 +99,13 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 		}
 		let url = fullUrl.pathname;
 		if (IS_API_REST_FS && handler.preHandle) {
-			let pathname = fullUrl.pathname;
 			if (Array.isArray(handler.preHandle.transform)) {
 				handler.preHandle.transform.forEach(({ searchValue, replaceValue }) => {
-					pathname = pathname.replace(searchValue, replaceValue);
+					url = url.replace(searchValue, replaceValue);
 				});
 			} else {
-				pathname = handler.preHandle.transform(pathname);
+				url = handler.preHandle.transform(url);
 			}
-			url = pathname + fullUrl.search;
 		}
 
 		const endpointNoPrefix = Utils.request.removeSlash(Utils.request.removeEndpointPrefix(url, endpointPrefix), "trailing");
@@ -404,7 +402,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 						try {
 							logger.debug("handlingApiFsRequest: applying pagination and filters");
 							Utils.request.applyPaginationAndFilters(request, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin, dataFile);
-							if (!dataFile.data || Array.isArray(dataFile.data) && dataFile.data.length === 0) {
+							if (dataFile.data === null || dataFile.data === undefined || (Array.isArray(dataFile.data) && dataFile.data.length === 0)) {
 								throw new UniversalApiError("Partial resource to delete not found", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.NOT_FOUND);
 							}
 						} catch (error: any) {
