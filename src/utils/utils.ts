@@ -434,9 +434,18 @@ export const Utils = {
 						}
 						for (const parserFn of parserFunc) {
 							await new Promise<void>((resolve, reject) => {
-								const next = (error?: any) => error ? reject(error) : resolve();
+								let usesPromise = false;
+								const next = (error?: any) => {
+									if (usesPromise) {
+										return;
+									}
+									error ? reject(error) : resolve();
+								};
+
 								const result = parserFn(request, res, next);
+
 								if (result && typeof (result as any).then === "function") {
+									usesPromise = true;
 									(result as Promise<void>).then(() => resolve(), reject);
 								}
 							});
