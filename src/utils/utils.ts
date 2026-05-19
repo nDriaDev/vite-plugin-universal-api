@@ -193,13 +193,13 @@ export const Utils = {
 			await unlink(s);
 		},
 		getByteLength(data: any) {
-			let value;
+			let value: string;
 			try {
 				value = typeof data === "string"
 					? data
-					: JSON.stringify(data)
+					: JSON.stringify(data) ?? "";
 			} catch (_) {
-				value = data;
+				value = String(data);
 			}
 			return Buffer.byteLength(value, "utf-8");
 		},
