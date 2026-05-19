@@ -186,8 +186,14 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 								logger.debug("handlingApiFsRequest: parsing request");
 								await Utils.request.parseRequest(request, res, fullUrl, parser, logger);
 							}
-							if (request.body !== null || request.files !== null) {
+							if (request.files !== null) {
 								throw new UniversalApiError(`${request.method} request cannot have a body in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+							}
+							if (request.body !== null) {
+								const cleanBody = Utils.request.getCleanBody(request.method, request.body, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin);
+								if (cleanBody !== null) {
+									throw new UniversalApiError(`${request.method} request cannot have a body in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+								}
 							}
 							try {
 								logger.debug("handlingApiFsRequest: applying pagination and filters");
@@ -391,8 +397,14 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 					logger.debug("handlingApiFsRequest: parsing request");
 					await Utils.request.parseRequest(request, res, fullUrl, parser, logger);
 				}
-				if (request.body !== null || request.files !== null) {
+				if (request.files !== null) {
 					throw new UniversalApiError(`DELETE request cannot have a body in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+				}
+				if (request.body !== null) {
+					const cleanBody = Utils.request.getCleanBody(request.method, request.body, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin);
+					if (cleanBody !== null) {
+						throw new UniversalApiError(`DELETE request cannot have a body in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+					}
 				}
 				result.status = Constants.HTTP_STATUS_CODE.NO_CONTENT;
 				try {
