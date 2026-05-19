@@ -367,9 +367,11 @@ export const Utils = {
 			return newUrl;
 		},
 		buildFullUrl(req: IncomingMessage, config: ResolvedConfig): URL {
-			const host = typeof config.server.host === "string"
+			const host = req.headers.host ?? (
+				typeof config.server.host === "string"
 				? config.server.host
-				: req.headers.host ?? "localhost";
+					: "localhost"
+			);
 			return new URL(req.url!, `http${config.server.https ? 's' : ''}://${host}`);
 		},
 		matchesEndpointPrefix(url: string | undefined, prefixes: string[]) {
