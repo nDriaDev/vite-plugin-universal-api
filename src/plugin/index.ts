@@ -31,13 +31,54 @@ export function universalApiPlugin(opts?: UniversalApiOptions): Plugin {
 	let logger: Logger = new Logger(Constants.PLUGIN_NAME, "info");
 	let currentHandler: ((req: IncomingMessage, res: ServerResponse, next: Connect.NextFunction) => Promise<void>) | null = null;
 	let registeredOnServer: HttpServer | null = null;
-	let configResolvedPromise: Promise<void> | null = null;
+	let asyncInitPromise: Promise<void> | null = null;
+
+	function runAsyncInit(): Promise<void> {
+		if (asyncInitPromise !== null) {
+			return asyncInitPromise;
+		}
+
+		asyncInitPromise = (async () => {
+			if (!options.fsDir || !(await Utils.files.isDirExists(options.fullFsDir!))) {
+				options.fullFsDir = null;
+				logger.info(`Directory with path ${options.fsDir} doesn't exist.`);
+			}
+			if (options.endpointPrefix.length === 0) {
+				logger.warn(`Endpoint prefix empty or invalid`);
+				options.disable = true;
+			}
+
+			logger.info(`plugin ${options.disable ? "disabled" : "started"}`);
+			logger.debug("Vite configResolved: FINISH");
+
+			/* v8 ignore start */
+			/**
+			 * INFO
+			 * plugin print on process.stdout/stderr with console. If the process
+			 * is running in background, when the client disconnects the session,
+			 * stdout/stderr receive EIO/EPIPE errors.
+			 * Register a handler to avoid killing the process on uncaughtException.
+			 */
+			const suppressIoError = (err: NodeJS.ErrnoException) => {
+				if (err.code !== 'EIO' && err.code !== 'EPIPE') {
+					throw err;
+				}
+			};
+			if (process.stdout.listenerCount('error') === 0) {
+				process.stdout.on('error', suppressIoError);
+			}
+			if (process.stderr.listenerCount('error') === 0) {
+				process.stderr.on('error', suppressIoError);
+			}
+			/* v8 ignore stop */
+		})();
+
+		return asyncInitPromise;
+	}
 
 	// INFO Shared logic for configureServer and configurePreviewServer.
 	async function setupServer(server: ViteDevServer | PreviewServer, hookName: "configureServer" | "configurePreviewServer"): Promise<void> {
-		if (configResolvedPromise) {
-			await configResolvedPromise;
-		}
+		await runAsyncInit();
 
 		const isPreview = hookName === "configurePreviewServer";
 
@@ -96,43 +137,6 @@ export function universalApiPlugin(opts?: UniversalApiOptions): Plugin {
 			logger = new Logger(Constants.PLUGIN_NAME, options.logLevel);
 			logger.debug("Vite configResolved: START");
 			logger.info(`plugin initializing ...`);
-
-			configResolvedPromise = (async () => {
-				if (!options.fsDir || !(await Utils.files.isDirExists(options.fullFsDir!))) {
-					options.fullFsDir = null;
-					logger.info(`Directory with path ${options.fsDir} doesn't exist.`);
-				}
-				if (options.endpointPrefix.length === 0) {
-					logger.warn(`Endpoint prefix empty or invalid`);
-					options.disable = true;
-				}
-
-				logger.info(`plugin ${options.disable ? "disabled" : "started"}`);
-				logger.debug("Vite configResolved: FINISH");
-				/* v8 ignore start */
-				/**
-				 * INFO
-				 * plugin print on process.stdout/stderr with console. If the process
-				 * is running in background, when the client disconnects the session,
-				 * stdout/stderr receive EIO/EPIPE errors.
-				 * Register a handler to avoid killing the process on uncaughtException.
-				 */
-				const suppressIoError = (err: NodeJS.ErrnoException) => {
-					if (err.code !== 'EIO' && err.code !== 'EPIPE') {
-						throw err;
-					}
-				};
-				if (process.stdout.listenerCount('error') === 0) {
-					process.stdout.on('error', suppressIoError);
-				}
-				if (process.stderr.listenerCount('error') === 0) {
-					process.stderr.on('error', suppressIoError);
-				}
-				/* v8 ignore stop */
-			})();
-
-			// INFO Return the promise so Vite awaits it when it supports async configResolved.
-			return configResolvedPromise;
 		},
 		configureServer(server) {
 			// INFO Return a function so Vite defers its execution to after the built-in middlewares are registered
