@@ -17,24 +17,40 @@ export class Logger implements ILogger {
 		this.logLevel = logLevel;
 	}
 
-	private log(msg: string[], prefix: string = "") {
-		this.logLevel !== "silent" && process.stdout.write(`${prefix}${this.packageName}${prefix ? this.colors.reset : ''} ${msg.join(" ")}\n`);
+	private serialize(value: unknown): string {
+		if (value instanceof Error) {
+			return value.stack ?? `${value.name}: ${value.message}`;
+		}
+		if (typeof value === "string") {
+			return value;
+		}
+		try {
+			return JSON.stringify(value);
+		} catch {
+			return String(value);
+		}
 	}
 
-	debug(...msg: string[]): void {
+	private log(msg: unknown[], prefix: string = "") {
+		this.logLevel !== "silent" && process.stdout.write(
+			`${prefix}${this.packageName}${prefix ? this.colors.reset : ''} ${msg.map(m => this.serialize(m)).join(" ")}\n`
+		);
+	}
+
+	debug(...msg: unknown[]): void {
 		this.logLevel === "debug" && this.log(msg, this.colors.debug);
 	}
 
-	info(...msg: string[]): void {
+	info(...msg: unknown[]): void {
 		["debug", "info", "warn"].includes(this.logLevel) && this.log(msg);
 	}
-	success(...msg: string[]): void {
+	success(...msg: unknown[]): void {
 		["debug", "info", "warn"].includes(this.logLevel) && this.log(msg, this.colors.green);
 	}
-	warn(...msg: string[]): void {
+	warn(...msg: unknown[]): void {
 		["debug", "info", "warn"].includes(this.logLevel) && this.log(msg, this.colors.yellow);
 	}
-	error(...msg: string[]): void {
+	error(...msg: unknown[]): void {
 		this.log(msg, this.colors.red);
 	}
 }

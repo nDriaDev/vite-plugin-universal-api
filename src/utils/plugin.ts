@@ -121,7 +121,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 			fileFound = true;
 		} else if (await Utils.files.isDirExists(filePath)) {
 			const files: string[] = await Utils.files.directoryFileList(filePath);
-			const fileIndex = files.find(el => el.startsWith("index.json")) ?? null;
+			const fileIndex = files.find(el => el === "index.json") ?? null;
 			if (fileIndex) {
 				fileFound = true;
 				file = join(filePath, fileIndex)
@@ -133,7 +133,11 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 			const lastSegmentPath = Utils.request.removeSlash(filePath.substring(pathBeforeLastSegment.length), "both");
 			if (lastSegmentPath !== "" && await Utils.files.isDirExists(pathBeforeLastSegment)) {
 				const files: string[] = await Utils.files.directoryFileList(pathBeforeLastSegment);
-				const fileExt = files.find(f => f.startsWith(lastSegmentPath)) ?? null;
+				const fileExt = files.find(f => {
+					const dotIdx = f.indexOf(".");
+					const baseName = dotIdx === -1 ? f : f.substring(0, dotIdx);
+					return baseName === lastSegmentPath;
+				}) ?? null;
 				if (fileExt) {
 					file = join(pathBeforeLastSegment, fileExt);
 					fileFound = true;
@@ -370,8 +374,9 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 					throw new UniversalApiError(`Error ${fileFound ? "updating" : "creating"} data`, "ERROR", fullUrl.pathname);
 				}
 				break;
-			case "PATCH":
-				if (!["application/json", "application/json-patch+json", "application/merge-patch+json"].includes(request.headers["content-type"] || "")) {
+			case "PATCH": {
+				const patchContentType = (request.headers["content-type"] || "").split(";")[0].trim();
+				if (!["application/json", "application/json-patch+json", "application/merge-patch+json"].includes(patchContentType)) {
 					throw new UniversalApiError(`PATCH request content-type unsupported in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.UNSUPPORTED_MEDIA_TYPE);
 				}
 				if (request.body === null) {
@@ -389,7 +394,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 				}
 				result.status = Constants.HTTP_STATUS_CODE.OK;
 				try {
-					const TYPE_PATCH = request.headers["content-type"] === "application/json-patch+json" ? "json" : "merge";
+					const TYPE_PATCH = patchContentType === "application/json-patch+json" ? "json" : "merge";
 					const newData = Utils.files.applyingPatch(JSON.parse(dataFile.data), request.body, TYPE_PATCH);
 					await Utils.files.writingFile(file, fileFound, newData, dataFile.mimeType, true);
 				} catch (error: any) {
@@ -402,6 +407,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 					logger.error(`handlingApiFsRequest: Error partial updating resource with PATCH method`, error);
 					throw new UniversalApiError("Error partial updating resource", "ERROR", fullUrl.pathname);
 				}
+			}
 				break;
 			case "OPTIONS":
 				throw new UniversalApiError(`Method OPTIONS not allowed in File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.METHOD_NOT_ALLOWED);
@@ -1047,7 +1053,11 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 			ws.on("error", async (err: Error) => {
 				logger.debug(`runWsPlugin: socket error for ${connection.id}: `, err.message);
 				if (currentHandler.onError) {
-					await currentHandler.onError(connection, err);
+					try {
+						await currentHandler.onError(connection, err);
+					} catch (handlerErr: any) {
+						logger.error(`runWsPlugin: error in onError handler for ${connection.id}: `, handlerErr?.message ?? String(handlerErr));
+					}
 				} else {
 					logger.error(`runWsPlugin: socket error for ${connection.id}: `, err.message);
 				}
