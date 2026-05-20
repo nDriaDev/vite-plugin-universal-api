@@ -159,11 +159,16 @@ export interface IWebSocketConnection {
 	broadcast(data: any, options?: { room?: string; includeSelf?: boolean }): void;
 
 	/**
-	 * Broadcasts a message to all connections in all rooms that this connection is a member of.
-	 * If not in any rooms, broadcasts globally.
+	 * Broadcasts a message to all connections that share at least one room with
+	 * this connection.
+	 *
+	 * Each room this connection belongs to is iterated and the message is sent
+	 * to every other member of that room (deduplication is handled at the
+	 * manager level). If the connection has not joined any room, this method is
+	 * a no-op — it does **not** fall back to a global broadcast.
 	 *
 	 * @param data - The data to broadcast
-	 * @param includeSelf - Whether to include the current connection
+	 * @param includeSelf - Whether to include the current connection in the broadcast
 	 */
 	broadcastAllRooms(data: any, includeSelf?: boolean): void;
 

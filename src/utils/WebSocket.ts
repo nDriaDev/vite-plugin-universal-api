@@ -138,24 +138,20 @@ export class WebSocketConnection implements IWebSocketConnection {
 	}
 
 	broadcastAllRooms(data: any, includeSelf = false): void {
-		if (this.rooms.size === 0) {
-			this.manager.broadcast(data, { excludeId: includeSelf ? undefined : this.id });
-		} else {
-			this.rooms.forEach(room => {
-				this.manager.broadcast(data, { room, excludeId: includeSelf ? undefined : this.id });
-			});
-		}
+		this.rooms.forEach(room => {
+			this.manager.broadcast(data, { room, excludeId: includeSelf ? undefined : this.id });
+		});
 	}
 
 	ping(payload?: string | Buffer) {
-		if (this._closed){
+		if (this._closed) {
 			return;
 		}
 		this.ws.ping(payload);
 	}
 
 	pong(payload?: string | Buffer) {
-		if (this._closed){
+		if (this._closed) {
 			return;
 		}
 		this.ws.pong(payload);
