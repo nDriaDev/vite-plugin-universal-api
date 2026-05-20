@@ -2,7 +2,7 @@ import { IncomingMessage, ServerResponse } from "node:http";
 import { Connect, PreviewServer, ViteDevServer } from "vite";
 import { ApiWsRestFsDataResponse, UniversalApiRestFsHandler, UniversalApiOptionsRequired, UniversalApiRequest, HandledRequestData, UniversalApiWsHandler, UniversalApiAuthenticate } from "../models/plugin.model";
 import { Utils } from "./utils";
-import { join, parse } from "node:path";
+import { join, parse, sep } from "node:path";
 import { MimeType } from "./MimeType";
 import { Constants } from "./constants";
 import { AntPathMatcher } from "./AntPathMatcher";
@@ -110,6 +110,10 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 
 		const endpointNoPrefix = Utils.request.removeSlash(Utils.request.removeEndpointPrefix(url, endpointPrefix), "trailing");
 		const filePath = join(fullFsDir, endpointNoPrefix);
+		// INFO Guard against path-traversal: the resolved path must remain inside fullFsDir.
+		if (!filePath.startsWith(fullFsDir + sep) && filePath !== fullFsDir) {
+			throw new UniversalApiError("Forbidden", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.FORBIDDEN);
+		}
 		let file: string = filePath,
 			fileFound;
 		if (await Utils.files.isFileExists(filePath)) {
