@@ -667,7 +667,8 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 					data,
 					readFile: false,
 					isError: false,
-					headers
+					headers,
+					req
 				});
 			})
 			.catch((error: UniversalApiError) => {
@@ -963,8 +964,9 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 					}
 				}
 
-				if (currentHandler.delay && currentHandler.delay > 0) {
-					await new Promise(res => setTimeout(res, currentHandler.delay));
+				const effectiveDelay = currentHandler.delay ?? options.delay;
+				if (effectiveDelay && effectiveDelay > 0) {
+					await new Promise(res => setTimeout(res, effectiveDelay));
 				}
 
 				let matched = false;

@@ -955,6 +955,9 @@ export const Utils = {
 								...pagPlugin
 							}
 						);
+					} else if (!paginationHandler.exclusive) {
+						// INFO Neither exclusive nor inclusive is set — fall back to plugin-level pagination.
+						pagPlugin != null && (result.pagination = { ...pagPlugin });
 					}
 					if ([limit, skip, order, sort].some(el => el !== null)) {
 						if (result.pagination !== null) {
@@ -1046,7 +1049,9 @@ export const Utils = {
 			if (typeof dataFile.data === "string") {
 				dataFile.data = JSON.parse(dataFile.data);
 			}
-			dataFile.originalData = Utils.plugin.cloneData(dataFile.data);
+			if (dataFile.originalData === null || dataFile.originalData === undefined) {
+				dataFile.originalData = Utils.plugin.cloneData(dataFile.data);
+			}
 			const IS_ARRAY = Array.isArray(dataFile.data);
 			if (![null, undefined].includes(dataFile.data)) {
 				const { pagination, filters } = this.getPaginationAndFilters(request, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin);
@@ -1426,8 +1431,15 @@ export const Utils = {
 					responseData.headers.forEach(({ name, value }) => {
 						res.setHeader(name, value);
 					});
+					const isHead = (responseData.req as IncomingMessage | undefined)?.method === "HEAD";
 					if (responseData.data !== this.NO_RESPONSE) {
-						res.write(responseData.data, callbackErrorWritingResponse);
+						const serialised = responseData.data as string;
+						res.setHeader("content-length", Buffer.byteLength(serialised, "utf-8"));
+						if (isHead) {
+							endResponse();
+						} else {
+							res.write(serialised, callbackErrorWritingResponse);
+						}
 					} else {
 						endResponse();
 					}
