@@ -148,6 +148,8 @@ export function universalApiPlugin(opts?: UniversalApiOptions): Plugin {
 		configResolved(conf) {
 			options = Utils.plugin.initOptions(opts, conf);
 			logger = new Logger(Constants.PLUGIN_NAME, options.logLevel);
+			// INFO new options on every configResolved call (e.g. after an HMR restart).
+			asyncInitPromise = null;
 			logger.debug("Vite configResolved: START");
 			logger.debug(`plugin initializing ...`);
 		},
