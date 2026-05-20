@@ -90,7 +90,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 				return false;
 			}
 		}
-		handler === null && logger.info("Request handling with FS API");
+		handler === null && logger.debug("Request handling with FS API");
 		const dataFile: { originalData: any, data: any, mimeType: string, total: number } = {
 			total: 0,
 			data: null,
@@ -882,7 +882,9 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 			});
 
 			ws.on("ping", async (data: Buffer) => {
-				connection.resetMissedPong();
+				if (currentHandler.inactivityTimeout && currentHandler.inactivityTimeout > 0) {
+					connection.resetInactivityTimer(currentHandler.inactivityTimeout);
+				}
 				if (currentHandler.onPing) {
 					try {
 						await currentHandler.onPing(connection, data);
