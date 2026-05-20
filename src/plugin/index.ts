@@ -13,6 +13,7 @@ export function universalApiPlugin(opts?: UniversalApiOptions): Plugin {
 		delay: 0,
 		gatewayTimeout: 0,
 		endpointPrefix: [],
+		rejectedPrefixes: [],
 		enableWs: false,
 		enablePreview: true,
 		fsDir: null,
@@ -41,14 +42,26 @@ export function universalApiPlugin(opts?: UniversalApiOptions): Plugin {
 		asyncInitPromise = (async () => {
 			if (!options.fsDir || !(await Utils.files.isDirExists(options.fullFsDir!))) {
 				options.fullFsDir = null;
-				logger.info(`Directory with path ${options.fsDir} doesn't exist.`);
+				logger.debug(`Directory with path ${options.fsDir} doesn't exist.`);
+			}
+			if (options.rejectedPrefixes.length > 0) {
+				logger.warn(
+					`The following endpointPrefix values resolve to the root path and have been ignored: ` +
+					`[${options.rejectedPrefixes.map(p => `"${p || "/"}"`).join(", ")}]. ` +
+					`The root path "/" cannot be used as a prefix because it would intercept every request. ` +
+					`Use a more specific prefix such as "/api".`
+				);
 			}
 			if (options.endpointPrefix.length === 0) {
-				logger.warn(`Endpoint prefix empty or invalid`);
+				logger.warn(
+					options.rejectedPrefixes.length > 0
+						? `All configured prefixes were invalid (see warning above) — plugin disabled.`
+						: `endpointPrefix is empty or was not provided — plugin disabled.`
+				);
 				options.disable = true;
 			}
 
-			logger.info(`plugin ${options.disable ? "disabled" : "started"}`);
+			logger.debug(`plugin ${options.disable ? "disabled" : "started"}`);
 			logger.debug("Vite configResolved: FINISH");
 
 			/* v8 ignore start */
@@ -136,7 +149,7 @@ export function universalApiPlugin(opts?: UniversalApiOptions): Plugin {
 			options = Utils.plugin.initOptions(opts, conf);
 			logger = new Logger(Constants.PLUGIN_NAME, options.logLevel);
 			logger.debug("Vite configResolved: START");
-			logger.info(`plugin initializing ...`);
+			logger.debug(`plugin initializing ...`);
 		},
 		configureServer(server) {
 			// INFO Return a function so Vite defers its execution to after the built-in middlewares are registered

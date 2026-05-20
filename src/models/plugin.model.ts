@@ -1882,7 +1882,20 @@ export type UniversalApiOptions = UniversalApiBaseOptions & (
 );
 
 /** @internal */
-export type UniversalApiOptionsRequired = Omit<Required<UniversalApiOptions>, "handlerMiddlewares" | "endpointPrefix"> & { endpointPrefix: string[], fullFsDir: string | null, config: ResolvedConfig, matcher: AntPathMatcher, middlewares: UniversalApiMiddleware[] };
+export type UniversalApiOptionsRequired = Omit<Required<UniversalApiOptions>, "handlerMiddlewares" | "endpointPrefix"> & {
+	endpointPrefix: string[];
+	/**
+	 * Prefixes that were provided by the user but rejected because they resolve
+	 * to the root path ("/") after normalisation. Stored so that runAsyncInit
+	 * can emit a targeted warning through the logger instead of the generic
+	 * "prefix empty or invalid" message.
+	 */
+	rejectedPrefixes: string[];
+	fullFsDir: string | null;
+	config: ResolvedConfig;
+	matcher: AntPathMatcher;
+	middlewares: UniversalApiMiddleware[];
+};
 
 /** @internal */
 export interface HandledRequestData {

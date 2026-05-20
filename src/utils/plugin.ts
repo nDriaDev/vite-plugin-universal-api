@@ -498,7 +498,7 @@ async function handlingApiRestRequest(logger: ILogger, matcher: AntPathMatcher, 
 		}
 		if (handler !== null) {
 			logger.debug("handlingApiRestRequest: using REST api");
-			logger.info("Request handling with REST API: handler matched= ", handler.pattern);
+			logger.debug("Request handling with REST API: handler matched= ", handler.pattern);
 
 			if (handler.authenticate) {
 				try {
@@ -572,7 +572,7 @@ const runPluginInternal = async (req: IncomingMessage, res: ServerResponse, logg
 		}
 
 		if (!Utils.request.matchesEndpointPrefix(req.url, endpointPrefix)) {
-			logger.info(`runPluginInternal: Request with url ${req.url} doesn't match endpointPrefix option.`);
+			logger.debug(`runPluginInternal: Request with url ${req.url} doesn't match endpointPrefix option.`);
 			throw new UniversalApiError("Request doesn't match endpointPrefix", "NO_HANDLER", fullUrl.pathname);
 		}
 		const request = Utils.request.createRequest(req);

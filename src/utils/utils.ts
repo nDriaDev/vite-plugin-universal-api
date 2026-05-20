@@ -64,17 +64,20 @@ export const Utils = {
 				endpoint = Utils.request.removeSlash(endpoint, "trailing");
 				return endpoint;
 			};
-			const endpointPrefix = opts?.endpointPrefix
+			const rawPrefixes: string[] = opts?.endpointPrefix
 				? Array.isArray(opts.endpointPrefix) && opts.endpointPrefix.length > 0
 					? opts.endpointPrefix.map(normalizePrefix)
 					: Array.isArray(opts.endpointPrefix) ? opts.endpointPrefix : [normalizePrefix(opts.endpointPrefix)]
 				: ['/api'];
+			const rejectedPrefixes = rawPrefixes.filter(el => el === "" || el === "/");
+			const endpointPrefix = rawPrefixes.filter(el => el !== "" && el !== "/");
 			return {
 				disable: opts?.disable ?? false,
 				logLevel: opts?.logLevel || "info",
 				delay: opts?.delay ? opts.delay : 0,
 				gatewayTimeout: opts?.gatewayTimeout ?? 0,
-				endpointPrefix: endpointPrefix.filter(el => el !== "" && el !== "/"),
+				rejectedPrefixes,
+				endpointPrefix,
 				enableWs: opts?.enableWs ?? false,
 				enablePreview: opts?.enablePreview ?? true,
 				fsDir: opts?.fsDir ?? null,
@@ -984,9 +987,8 @@ export const Utils = {
 			return result;
 		},
 		applyPaginationAndFilters(request: UniversalApiRequest<any>, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"], dataFile: { originalData: any, data: any, mimeType: string, total: number }) {
-			const data = JSON.parse(dataFile.data);
-			dataFile.originalData = JSON.parse(dataFile.data);
-			dataFile.data = data;
+			dataFile.data = JSON.parse(dataFile.data);
+			dataFile.originalData = Utils.plugin.cloneData(dataFile.data);
 			const IS_ARRAY = Array.isArray(dataFile.data);
 			if (![null, undefined].includes(dataFile.data)) {
 				const { pagination, filters } = this.getPaginationAndFilters(request, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin);
