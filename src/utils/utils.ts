@@ -58,7 +58,11 @@ export const Utils = {
 			}
 		},
 		initOptions(opts: UniversalApiOptions | undefined, config: ResolvedConfig): UniversalApiOptionsRequired {
-			const fullFsDir = join(config.root, opts?.fsDir ?? "");
+			// Only resolve fullFsDir when fsDir is explicitly provided.
+			// join(config.root, "") returns config.root (a non-empty string), which
+			// would pass the `|| null` check and expose the entire project root via
+			// the FS API when no fsDir is configured.
+			const fullFsDir = opts?.fsDir ? join(config.root, opts.fsDir) : null;
 			const normalizePrefix = (el: string): string => {
 				let endpoint = Utils.request.addSlash(el, "leading");
 				endpoint = Utils.request.removeSlash(endpoint, "trailing");
@@ -81,7 +85,7 @@ export const Utils = {
 				enableWs: opts?.enableWs ?? false,
 				enablePreview: opts?.enablePreview ?? true,
 				fsDir: opts?.fsDir ?? null,
-				fullFsDir: fullFsDir || null,
+				fullFsDir,
 				noHandledRestFsRequestsAction: opts?.noHandledRestFsRequestsAction ?? "404",
 				parser: opts?.parser ?? true,
 				middlewares: opts?.handlerMiddlewares ?? [],
