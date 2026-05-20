@@ -689,8 +689,8 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 						}
 						break;
 					case "MANUALLY_HANDLED":
-						dataResponse.data = `${error.message} Handled request did not send any response`;
-						dataResponse.errorMiddlewares = undefined;
+						settleReject("MANUALLY_HANDLED");
+						callReject = true;
 						break;
 					case "ERROR":
 						dataResponse.status = error.getCode();
@@ -724,6 +724,10 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 		logger.debug(`runPlugin: runInternalPlugin error`);
 		if (error === "next") {
 			next();
+		} else if (error === "MANUALLY_HANDLED") {
+			if (!response.writableEnded) {
+				response.end();
+			}
 		} else {
 			next(error);
 		}
@@ -797,18 +801,21 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 		const endpointNoPrefix = Utils.request.removeEndpointPrefix(url.pathname, options.endpointPrefix);
 
 		let handler: typeof wsHandlers[number] | null = null;
+		let wsParams: Record<string, string> | null = null;
 		for (const handle of wsHandlers) {
+			const candidateParams: Record<string, string> = {};
 			const matched = options.matcher.doMatch(
 				Utils.request.addSlash(handle.pattern, "leading"),
 				Utils.request.addSlash(endpointNoPrefix, "leading"),
 				true,
-				null
+				candidateParams
 			);
 			if (matched) {
 				if (handle.disabled) {
 					logger.debug("runWsPlugin: matched handler is disabled");
 				} else {
 					handler = handle;
+					wsParams = Object.keys(candidateParams).length > 0 ? candidateParams : null;
 					break;
 				}
 			}
@@ -854,6 +861,7 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 
 		handlerWss.handleUpgrade(req, socket as any, head, async (ws) => {
 			logger.debug(`runWsPlugin: connection upgraded for ${url.pathname}`);
+			(req as any).params = wsParams;
 			const connection = new WebSocketConnection(
 				logger,
 				ws,

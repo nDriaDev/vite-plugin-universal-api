@@ -25,7 +25,12 @@ function patchWalkPath(target: any, path: string) {
 
 	for (let i = 0; i < segments.length - 1; i++) {
 		const key = segments[i];
-		if (!(key in current)) {
+		if (Array.isArray(current)) {
+			const idx = parseInt(key, 10);
+			if (isNaN(idx) || idx < 0 || idx >= current.length) {
+				throw new UniversalApiError("PATCH body request malformed", "ERROR", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+			}
+		} else if (typeof current !== "object" || current === null || !(key in current)) {
 			throw new UniversalApiError("PATCH body request malformed", "ERROR", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 		}
 		current = current[key];
@@ -444,6 +449,10 @@ export const Utils = {
 		},
 		async parseRequest(request: UniversalApiRequest<any>, res: ServerResponse, fullUrl: URL, parserRequest: UniversalApiParser, logger: ILogger) {
 			try {
+				if (request.body !== null || request.files !== null || request.readableEnded) {
+					logger.debug("parseRequest: skipped (already parsed or stream ended)");
+					return;
+				}
 				if (parserRequest) {
 					logger.debug("parseRequest: START");
 					if (typeof parserRequest === "object") {
@@ -670,8 +679,10 @@ export const Utils = {
 				}
 				try {
 					await next(error);
-					if (lastError && !res.writableEnded) {
-						throw lastError;
+					if (lastError) {
+						if (!res.writableEnded) {
+							throw lastError;
+						}
 					}
 				} catch (finalError: any) {
 					throw new UniversalApiError(finalError, "ERROR_MIDDLEWARE", "", Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR);
@@ -692,8 +703,8 @@ export const Utils = {
 		hasPaginationOrFilters(method: UniversalApiRequest<any>["method"], paginationPlugin: UniversalApiOptionsRequired["pagination"], filterPlugin: UniversalApiOptionsRequired["filters"], paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"]) {
 			return (!!paginationHandler && paginationHandler !== "none")
 				|| (!!filtersHandler && filtersHandler !== "none")
-				|| (paginationPlugin !== null && (method! in paginationPlugin || "ALL" in paginationPlugin))
-				|| (filterPlugin !== null && (method! in filterPlugin || "ALL" in filterPlugin))
+				|| (paginationPlugin != null && (method! in paginationPlugin || "ALL" in paginationPlugin))
+				|| (filterPlugin != null && (method! in filterPlugin || "ALL" in filterPlugin))
 		},
 		getPaginationAndFilters(request: UniversalApiRequest<any>, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"]): { pagination: null | { limit: null | number, skip: null | number, sort: null | string, order: null | string }, filters: null | { key: string, value: any, comparison: string, regexFlags?: string }[] } {
 			const result: { pagination: null | { limit: null | number, skip: null | number, sort: null | string, order: null | string }, filters: null | { key: string, value: any, comparison: string, regexFlags?: string }[] } = {
@@ -1235,7 +1246,6 @@ export const Utils = {
 			res.statusCode = data.status;
 			data.headers.forEach(({ name, value }) => res.setHeader(name, value));
 			res.setHeader("content-length", size);
-			data.headers.push({ name: "content-length", value: size });
 			const stream = createReadStream(data.data);
 
 			const cleanup = (err?: Error) => {
