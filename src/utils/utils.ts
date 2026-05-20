@@ -1,5 +1,7 @@
 import { createReadStream, createWriteStream, PathLike } from "node:fs";
-import { mkdir, readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { randomBytes } from "node:crypto";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { ApiWsRestFsDataResponse, UniversalApiErrorMiddleware, UniversalApiRestFsHandler, UniversalApiMiddleware, UniversalApiOptions, UniversalApiOptionsRequired, UniversalApiParser, UniversalApiParserFunction, UniversalApiRequest } from "../models/plugin.model";
 import { ResolvedConfig } from "vite";
@@ -10,6 +12,22 @@ import { MimeType, MimeTypeExt } from "./MimeType";
 import { Constants } from "./constants";
 import { UniversalApiError } from "./Error";
 import { ILogger } from "../models/logger.model";
+
+// INFO Per-file write mutex: prevents concurrent writes from interleaving on the same path.
+const _writeLocks = new Map<string, Promise<void>>();
+function withWriteLock<T>(path: string, fn: () => Promise<T>): Promise<T> {
+	const prev = _writeLocks.get(path) ?? Promise.resolve();
+	let resolveOuter!: () => void;
+	const next = new Promise<void>(res => { resolveOuter = res; });
+	_writeLocks.set(path, next);
+	return prev.then(() => fn()).finally(() => {
+		resolveOuter();
+		// INFO Only delete the entry if it still points to our promise (no new waiter queued).
+		if (_writeLocks.get(path) === next) {
+			_writeLocks.delete(path);
+		}
+	}) as Promise<T>;
+}
 
 function patchWalkPath(target: any, path: string) {
 	if (path === '' || path === '/') {
@@ -176,30 +194,41 @@ export const Utils = {
 			return promise;
 		},
 		async writingFile(s: string, fileFound: boolean, data: any, mimeType: MimeType | null, withStream: boolean) {
-			const { dir, ext } = parsePath(s);
-			let file, path = s, options = {};
-			if (!fileFound) {
-				await Utils.files.createDir(dir);
-			}
-			if (!ext && mimeType != null) {
-				const extFile = MimeTypeExt[mimeType];
-				path += `${extFile ? extFile : typeof data === "string" ? ".txt" : ""}`;
-			}
-			if ((mimeType != null && mimeType.toString() === MimeType[".json"]) || (!!ext && ext === MimeTypeExt["application/json"])) {
-				file = JSON.stringify(data, null, 2);
-				options = { encoding: "utf-8" };
-			} else {
-				if (typeof data === "object" && !Buffer.isBuffer(data)) {
+			return withWriteLock(s, async () => {
+				const { dir, ext } = parsePath(s);
+				let file, path = s, options: any = {};
+				if (!fileFound) {
+					await Utils.files.createDir(dir);
+				}
+				if (!ext && mimeType != null) {
+					const extFile = MimeTypeExt[mimeType];
+					path += `${extFile ? extFile : typeof data === "string" ? ".txt" : ""}`;
+				}
+				if ((mimeType != null && mimeType.toString() === MimeType[".json"]) || (!!ext && ext === MimeTypeExt["application/json"])) {
 					file = JSON.stringify(data, null, 2);
 					options = { encoding: "utf-8" };
 				} else {
-					file = data;
-					typeof data === "string" && (options = { encoding: "utf-8" });
+					if (typeof data === "object" && !Buffer.isBuffer(data)) {
+						file = JSON.stringify(data, null, 2);
+						options = { encoding: "utf-8" };
+					} else {
+						file = data;
+						typeof data === "string" && (options = { encoding: "utf-8" });
+					}
 				}
-			}
-			withStream
-				? await this.writingStreamFile(path, file, options)
-				: await writeFile(path, file, options);
+				const tmpPath = join(dir || tmpdir(), `.~${randomBytes(6).toString("hex")}.tmp`);
+				try {
+					if (withStream) {
+						await this.writingStreamFile(tmpPath, file, options);
+					} else {
+						await writeFile(tmpPath, file, options);
+					}
+					await rename(tmpPath, path);
+				} catch (err) {
+					await unlink(tmpPath).catch(() => undefined);
+					throw err;
+				}
+			});
 		},
 		async removeFile(s: PathLike) {
 			await unlink(s);
