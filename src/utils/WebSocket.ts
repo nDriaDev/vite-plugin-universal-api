@@ -176,7 +176,6 @@ export class WebSocketConnection implements IWebSocketConnection {
 		this._closed = true;
 		this.stopHeartbeat();
 		this.stopInactivityTimeout();
-		this.manager.remove(this.id);
 		return new Promise((resolve) => {
 			// INFO Resolve once the underlying socket fully closes after the handshake
 			this.ws.once('close', () => resolve());

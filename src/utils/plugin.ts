@@ -1028,17 +1028,18 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 			});
 
 			ws.on("close", async (code: number, reason: Buffer) => {
-				if (!connection.closed) {
+				const wasAlreadyClosed = connection.closed;
+				if (!wasAlreadyClosed) {
 					connection.markClosed();
-					if (currentHandler.onClose) {
-						try {
-							await currentHandler.onClose(connection, code, reason.toString() || "", true);
-						} catch (err: any) {
-							logger.error(`runWsPlugin: error in onClose handler for ${connection.id}: `, err);
-						}
-					}
-					manager.remove(connection.id);
 				}
+				if (currentHandler.onClose) {
+					try {
+						await currentHandler.onClose(connection, code, reason.toString() || "", !wasAlreadyClosed);
+					} catch (err: any) {
+						logger.error(`runWsPlugin: error in onClose handler for ${connection.id}: `, err);
+					}
+				}
+				manager.remove(connection.id);
 			});
 
 			ws.on("error", async (err: Error) => {
