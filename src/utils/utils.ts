@@ -1228,9 +1228,10 @@ export const Utils = {
 		async sendStreamFile(res: ServerResponse, data: ApiWsRestFsDataResponse) {
 			const { promise, reject, resolve } = Utils.plugin.promiseWithResolver<void>();
 			const { size } = await stat(data.data);
-			data.headers.push({ name: "content-length", value: size });
 			res.statusCode = data.status;
 			data.headers.forEach(({ name, value }) => res.setHeader(name, value));
+			res.setHeader("content-length", size);
+			data.headers.push({ name: "content-length", value: size });
 			const stream = createReadStream(data.data);
 			stream.on('error', (err) => {
 				data.status = 500;
@@ -1268,16 +1269,15 @@ export const Utils = {
 							return;
 						}
 						res.statusCode = Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR;
-						res.write(
-							JSON.stringify({
-								status: Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR,
-								error: Object.entries(Constants.HTTP_STATUS_CODE).find(el => el[1] === responseData.status)?.[0] ?? "Internal Server Error",
-								message: "Error writing response",
-								path: "",
-								timestamp: new Date().toISOString()
-							}),
-							endResponse
-						);
+						const fallbackBody = JSON.stringify({
+							status: Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR,
+							error: Object.entries(Constants.HTTP_STATUS_CODE).find(el => el[1] === responseData.status)?.[0] ?? "Internal Server Error",
+							message: "Error writing response",
+							path: "",
+							timestamp: new Date().toISOString()
+						});
+						res.setHeader("content-length", Buffer.byteLength(fallbackBody, "utf-8"));
+						res.write(fallbackBody, endResponse);
 					} else {
 						endResponse();
 					}
@@ -1365,17 +1365,16 @@ export const Utils = {
 					responseData.headers.forEach(({ name }) => {
 						res.removeHeader(name);
 					});
+					const errorBody = JSON.stringify({
+						status: responseData.status,
+						error: Object.entries(Constants.HTTP_STATUS_CODE).find(el => el[1] === responseData.status)?.[0] ?? "Internal Server Error",
+						message: responseData.data ?? responseData.error?.message ?? "",
+						path: responseData.error?.getPath() ?? "",
+						timestamp: new Date().toISOString()
+					});
 					res.setHeader("content-type", MimeType[".json"]);
-					res.write(
-						JSON.stringify({
-							status: responseData.status,
-							error: Object.entries(Constants.HTTP_STATUS_CODE).find(el => el[1] === responseData.status)?.[0] ?? "Internal Server Error",
-							message: responseData.data ?? responseData.error?.message ?? "",
-							path: responseData.error?.getPath() ?? "",
-							timestamp: new Date().toISOString()
-						}),
-						callbackErrorWritingResponse
-					);
+					res.setHeader("content-length", Buffer.byteLength(errorBody, "utf-8"));
+					res.write(errorBody, callbackErrorWritingResponse);
 				} else {
 					responseData.headers.forEach(({ name, value }) => {
 						res.setHeader(name, value);
