@@ -399,6 +399,18 @@ export const Utils = {
 			return url;
 		},
 		async mergeBodyChunk(req: IncomingMessage): Promise<Buffer | null> {
+			if (req.readableEnded) {
+				return null;
+			}
+			if ((req as any).complete && req.readableLength > 0) {
+				const buffered: Buffer[] = [];
+				let chunk: Buffer | null;
+				while ((chunk = req.read() as Buffer | null) !== null) {
+					buffered.push(chunk);
+				}
+				return buffered.length > 0 ? Buffer.concat(buffered) : null;
+			}
+
 			const chunks: Buffer[] = [];
 			let receiveData = false;
 			const { promise, resolve, reject } = Utils.plugin.promiseWithResolver<Buffer | null>();
