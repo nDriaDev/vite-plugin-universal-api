@@ -298,6 +298,15 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 							: dataFile.data
 								? 1
 								: 0;
+						if (!HAS_PAG_OR_FILT && typeof dataFile.data === "string") {
+							try {
+								dataFile.data = JSON.parse(dataFile.data);
+								result.data = dataFile.data;
+								dataFile.total = Array.isArray(dataFile.data) ? dataFile.data.length : dataFile.data ? 1 : 0;
+							} catch (_) {
+								// INFO Not valid JSON — leave as string; byte length is still accurate
+							}
+						}
 						result.headers.push(
 							{ name: "content-type", value: dataFile.mimeType },
 							{ name: "content-length", value: Utils.files.getByteLength(dataFile.data) },
@@ -361,7 +370,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 				if (!["application/json", "application/json-patch+json", "application/merge-patch+json"].includes(request.headers["content-type"] || "")) {
 					throw new UniversalApiError(`PATCH request content-type unsupported in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.UNSUPPORTED_MEDIA_TYPE);
 				}
-				if (!IS_API_REST_FS) {
+				if (request.body === null) {
 					logger.debug("handlingApiFsRequest: parsing request");
 					await Utils.request.parseRequest(request, res, fullUrl, parser, logger);
 				}
@@ -370,6 +379,9 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 				}
 				if (dataFile.mimeType !== MimeType[".json"]) {
 					throw new UniversalApiError(`Only json file can be processing with PATCH http method`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+				}
+				if (request.body === null) {
+					throw new UniversalApiError("PATCH request body is missing", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 				}
 				result.status = Constants.HTTP_STATUS_CODE.OK;
 				try {
