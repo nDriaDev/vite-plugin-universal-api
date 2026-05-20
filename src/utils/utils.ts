@@ -1233,17 +1233,21 @@ export const Utils = {
 			res.setHeader("content-length", size);
 			data.headers.push({ name: "content-length", value: size });
 			const stream = createReadStream(data.data);
-			stream.on('error', (err) => {
-				data.status = 500;
-				reject(err);
-			});
-			res.on('error', (err) => {
-				data.status = 500;
-				reject(err);
-			});
-			res.on('finish', () => {
-				resolve();
-			});
+
+			const cleanup = (err?: Error) => {
+				// Stop piping and free the file descriptor even if res is still open.
+				stream.unpipe(res);
+				stream.destroy();
+				if (err) {
+					data.status = 500;
+					reject(err);
+				}
+			};
+
+			stream.on('error', (err) => cleanup(err));
+			res.on('error', (err) => cleanup(err));
+			res.on('finish', () => resolve());
+
 			stream.pipe(res);
 			return promise;
 		},
