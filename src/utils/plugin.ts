@@ -385,7 +385,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 				}
 				result.status = Constants.HTTP_STATUS_CODE.OK;
 				try {
-					const TYPE_PATCH = ["application/json", "application/merge-patch+json"].includes(request.headers["content-type"]!) ? "merge" : "json";
+					const TYPE_PATCH = request.headers["content-type"] === "application/json-patch+json" ? "json" : "merge";
 					const newData = Utils.files.applyingPatch(JSON.parse(dataFile.data), request.body, TYPE_PATCH);
 					await Utils.files.writingFile(file, fileFound, newData, dataFile.mimeType, true);
 				} catch (error: any) {

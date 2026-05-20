@@ -713,12 +713,12 @@ export const Utils = {
 							: null
 						: pag?.root && pag.root in request.body
 							? pag.limit && pag.limit in request.body[pag.root]
-								? request.body[pag.root][pag.limit]
+								? request.body[pag.root][pag.limit] != null
 									? Number(request.body[pag.root][pag.limit])
 									: null
 								: null
 							: pag?.limit && pag.limit in request.body
-								? request.body[pag.limit]
+								? request.body[pag.limit] != null
 									? Number(request.body[pag.limit])
 									: null
 								: null
@@ -730,12 +730,12 @@ export const Utils = {
 							: null
 						: pag?.root && pag.root in request.body
 							? pag.skip && pag.skip in request.body[pag.root]
-								? request.body[pag.root][pag.skip]
+								? request.body[pag.root][pag.skip] != null
 									? Number(request.body[pag.root][pag.skip])
 									: null
 								: null
 							: pag?.skip && pag.skip in request.body
-								? request.body[pag.skip]
+								? request.body[pag.skip] != null
 									? Number(request.body[pag.skip])
 									: null
 								: null
@@ -848,12 +848,12 @@ export const Utils = {
 								: null
 							: paginationHandler[exclIncl]?.root && paginationHandler[exclIncl].root in request.body
 								? paginationHandler[exclIncl].limit && paginationHandler[exclIncl].limit in request.body[paginationHandler[exclIncl].root]
-									? request.body[paginationHandler[exclIncl].root][paginationHandler[exclIncl].limit]
+									? request.body[paginationHandler[exclIncl].root][paginationHandler[exclIncl].limit] != null
 										? Number(request.body[paginationHandler[exclIncl].root][paginationHandler[exclIncl].limit])
 										: null
 									: null
 								: paginationHandler[exclIncl]?.limit && paginationHandler[exclIncl].limit in request.body
-									? request.body[paginationHandler[exclIncl].limit]
+									? request.body[paginationHandler[exclIncl].limit] != null
 										? Number(request.body[paginationHandler[exclIncl].limit])
 										: null
 									: null
@@ -865,12 +865,12 @@ export const Utils = {
 								: null
 							: paginationHandler[exclIncl]?.root && paginationHandler[exclIncl].root in request.body
 								? paginationHandler[exclIncl].skip && paginationHandler[exclIncl].skip in request.body[paginationHandler[exclIncl].root]
-									? request.body[paginationHandler[exclIncl].root][paginationHandler[exclIncl].skip]
+									? request.body[paginationHandler[exclIncl].root][paginationHandler[exclIncl].skip] != null
 										? Number(request.body[paginationHandler[exclIncl].root][paginationHandler[exclIncl].skip])
 										: null
 									: null
 								: paginationHandler[exclIncl]?.skip && paginationHandler[exclIncl].skip in request.body
-									? request.body[paginationHandler[exclIncl].skip]
+									? request.body[paginationHandler[exclIncl].skip] != null
 										? Number(request.body[paginationHandler[exclIncl].skip])
 										: null
 									: null
@@ -1003,7 +1003,9 @@ export const Utils = {
 			return result;
 		},
 		applyPaginationAndFilters(request: UniversalApiRequest<any>, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"], dataFile: { originalData: any, data: any, mimeType: string, total: number }) {
-			dataFile.data = JSON.parse(dataFile.data);
+			if (typeof dataFile.data === "string") {
+				dataFile.data = JSON.parse(dataFile.data);
+			}
 			dataFile.originalData = Utils.plugin.cloneData(dataFile.data);
 			const IS_ARRAY = Array.isArray(dataFile.data);
 			if (![null, undefined].includes(dataFile.data)) {
@@ -1121,7 +1123,8 @@ export const Utils = {
 						}
 					}
 					if (filtersHandler && filtersHandler !== "none" && ((filtersHandler?.exclusive || filtersHandler?.inclusive)?.filters || []).length > 0) {
-						const filters = (filtersHandler.inclusive || filtersHandler.exclusive);
+						// INFO exclusive takes precedence over inclusive — mirror the priority used in getPaginationAndFilters.
+						const filters = (filtersHandler.exclusive || filtersHandler.inclusive);
 						filters && filters.filters.forEach(filter => {
 							if (filters.type === "body") {
 								filters.root && filters.root in elem && keysToExclude.push(filters.root);
@@ -1170,7 +1173,8 @@ export const Utils = {
 					}
 				}
 				if (filtersHandler && filtersHandler !== "none" && ((filtersHandler?.exclusive || filtersHandler?.inclusive)?.filters || []).length > 0) {
-					const filters = (filtersHandler.inclusive || filtersHandler.exclusive);
+					// INFO exclusive takes precedence over inclusive — mirror the priority used in getPaginationAndFilters.
+					const filters = (filtersHandler.exclusive || filtersHandler.inclusive);
 					filters && filters.filters.forEach(filter => {
 						if (filters.type === "body") {
 							filters.root && filters.root in body && keysToExclude.push(filters.root);
