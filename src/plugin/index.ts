@@ -26,6 +26,7 @@ export function universalApiPlugin(opts?: UniversalApiOptions): Plugin {
 		wsHandlers: [],
 		pagination: null,
 		filters: null,
+		disablePureFsApi: false,
 		config: {} as UniversalApiOptionsRequired["config"],
 		matcher: {} as UniversalApiOptionsRequired["matcher"],
 	};

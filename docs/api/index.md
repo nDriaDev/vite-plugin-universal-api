@@ -82,6 +82,34 @@ universalApi({
 If the directory doesn't exist, file-based routing will be disabled automatically, but the plugin will still work for custom handlers.
 :::
 
+### disablePureFsApi
+
+- **Type**: `boolean`
+- **Default**: `false`
+
+Disable the **pure File-System API** — the automatic fallback that maps incoming requests directly to files inside `fsDir` when no REST handler matches.
+
+When set to `true`, only REST handlers explicitly configured with `handle: "FS"` continue to read files from `fsDir`. Every other unmatched request is handled according to [`noHandledRestFsRequestsAction`](#nohandledrestfsrequestsaction) (default: `"404"`).
+
+> **This option does not affect handlers whose `handle` property is `"FS"`**. Those always keep their file-system behaviour, regardless of this flag.
+
+```typescript
+universalApi({
+  fsDir: 'mock',
+  disablePureFsApi: true,  // only explicit FS handlers can reach the filesystem
+  handlers: [
+    { pattern: '/api/users', method: 'GET', handle: 'FS' }
+  ]
+})
+
+// GET /api/users   → served from mock/api/users.json  ✓ (explicit FS handler)
+// GET /api/orders  → 404 / forwarded                  ✓ (pure FS fallback disabled)
+```
+
+::: tip When to use this option
+Use `disablePureFsApi: true` when you want explicit control over which endpoints are exposed and want to prevent the plugin from automatically serving any file that happens to exist under `fsDir`.
+:::
+
 ### enablePreview
 
 - **Type**: `boolean`
@@ -452,6 +480,7 @@ export default defineConfig({
       logLevel: 'debug',
       endpointPrefix: '/api',
       fsDir: 'mock',
+      disablePureFsApi: false, // set to true to expose only explicit FS handlers
 
       // Preview behaviour
       enablePreview: false, // Disable mocks when running vite preview

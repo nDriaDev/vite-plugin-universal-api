@@ -117,6 +117,7 @@ export const Utils = {
 				wsHandlers: opts?.wsHandlers ?? [],
 				pagination: opts?.pagination ?? null,
 				filters: opts?.filters ?? null,
+				disablePureFsApi: opts?.disablePureFsApi ?? false,
 				config,
 				matcher: new AntPathMatcher()
 			};

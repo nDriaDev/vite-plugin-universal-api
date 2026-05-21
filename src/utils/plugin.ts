@@ -598,7 +598,7 @@ async function handlingApiRestRequest(logger: ILogger, matcher: AntPathMatcher, 
 }
 
 const runPluginInternal = async (req: IncomingMessage, res: ServerResponse, logger: ILogger, options: UniversalApiOptionsRequired) => {
-	const { config, endpointPrefix, handlers, matcher, middlewares, errorMiddlewares, delay, fullFsDir, filters, pagination, parser } = options;
+	const { config, endpointPrefix, handlers, matcher, middlewares, errorMiddlewares, delay, fullFsDir, filters, pagination, parser, disablePureFsApi } = options;
 	const fullUrl = Utils.request.buildFullUrl(req, config);
 	const endpointNoPrefix = Utils.request.removeEndpointPrefix(fullUrl.pathname, endpointPrefix);
 	let requ: UniversalApiRequest<any> = req as UniversalApiRequest<any>;
@@ -625,9 +625,11 @@ const runPluginInternal = async (req: IncomingMessage, res: ServerResponse, logg
 			return result;
 		}
 
-		handled = await handlingApiFsRequest(logger, fullUrl, request, res, pagination, filters, parser, null, endpointPrefix, fullFsDir, result);
-		if (handled) {
-			return result;
+		if (!disablePureFsApi) {
+			handled = await handlingApiFsRequest(logger, fullUrl, request, res, pagination, filters, parser, null, endpointPrefix, fullFsDir, result);
+			if (handled) {
+				return result;
+			}
 		}
 
 		throw new UniversalApiError(`Impossible handling request with url ${fullUrl}`, "NO_HANDLER", fullUrl.pathname);
