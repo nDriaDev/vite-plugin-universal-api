@@ -138,6 +138,9 @@ export class WebSocketConnection implements IWebSocketConnection {
 	}
 
 	broadcastAllRooms(data: any, includeSelf = false): void {
+		if (this.rooms.size === 0) {
+			throw new Error("no rooms provided.");
+		}
 		this.rooms.forEach(room => {
 			this.manager.broadcast(data, { room, excludeId: includeSelf ? undefined : this.id });
 		});
