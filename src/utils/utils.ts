@@ -1242,6 +1242,7 @@ export const Utils = {
 				Reflect.ownKeys(newBody).length === 0 && (newBody = null);
 				return newBody;
 			}
+			return body;
 		},
 		/* v8 ignore start */
 		getBodyOtherData(originalBody: any, bodyClean: any, contentType: string) {
