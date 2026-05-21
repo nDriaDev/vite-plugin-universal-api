@@ -397,15 +397,15 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 				if (!["application/json", "application/json-patch+json", "application/merge-patch+json"].includes(patchContentType)) {
 					throw new UniversalApiError(`PATCH request content-type unsupported in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.UNSUPPORTED_MEDIA_TYPE);
 				}
-				if (request.body === null) {
-					logger.debug("handlingApiFsRequest: parsing request");
-					await Utils.request.parseRequest(request, res, fullUrl, parser, logger);
-				}
 				if (!fileFound) {
 					throw new UniversalApiError("Resource to update not found", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.NOT_FOUND);
 				}
 				if (dataFile.mimeType !== MimeType[".json"]) {
 					throw new UniversalApiError(`Only json file can be processing with PATCH http method`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+				}
+				if (!IS_API_REST_FS) {
+					logger.debug("handlingApiFsRequest: parsing request");
+					await Utils.request.parseRequest(request, res, fullUrl, parser, logger);
 				}
 				if (request.body === null) {
 					throw new UniversalApiError("PATCH request body is missing", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
