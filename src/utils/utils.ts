@@ -197,8 +197,9 @@ export const Utils = {
 			return withWriteLock(s, async () => {
 				const { dir, ext } = parsePath(s);
 				let file, path = s, options: any = {};
+				const effectiveDir = dir || process.cwd();
 				if (!fileFound) {
-					await Utils.files.createDir(dir);
+					await Utils.files.createDir(effectiveDir);
 				}
 				if (!ext && mimeType != null) {
 					const extFile = MimeTypeExt[mimeType];
@@ -216,7 +217,7 @@ export const Utils = {
 						typeof data === "string" && (options = { encoding: "utf-8" });
 					}
 				}
-				const tmpPath = join(dir || tmpdir(), `.~${randomBytes(6).toString("hex")}.tmp`);
+				const tmpPath = join(effectiveDir, `.~${randomBytes(6).toString("hex")}.tmp`);
 				try {
 					if (withStream) {
 						await this.writingStreamFile(tmpPath, file, options);
