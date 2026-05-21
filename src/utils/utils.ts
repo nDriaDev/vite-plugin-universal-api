@@ -1106,6 +1106,9 @@ export const Utils = {
 								case "regex":
 									result = RegExp(filter.value, filter.regexFlags || "").test(String(value))
 									break;
+								default:
+									result = false;
+									break;
 							}
 							return result;
 						});
