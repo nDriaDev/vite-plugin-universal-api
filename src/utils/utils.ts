@@ -742,7 +742,7 @@ export const Utils = {
 			}
 			let pagPlugin: typeof result.pagination = null;
 			let filtPlugin: typeof result.filters = null;
-			if (!!paginationPlugin && (request.method! in paginationPlugin || "ALL" in paginationPlugin && ["HEAD", "GET", "POST", "DELETE"].includes(request.method!))) {
+			if (!!paginationPlugin && (request.method! in paginationPlugin || ("ALL" in paginationPlugin && ["HEAD", "GET", "POST", "DELETE"].includes(request.method!)))) {
 				const pag = request.method! in paginationPlugin
 					? paginationPlugin[request.method! as keyof typeof paginationPlugin]
 					: paginationPlugin.ALL;
@@ -823,7 +823,7 @@ export const Utils = {
 					}
 				}
 			}
-			if (!!filtersPlugin && (request.method! in filtersPlugin || "ALL" in filtersPlugin && ["HEAD", "GET", "POST", "DELETE"].includes(request.method!))) {
+			if (!!filtersPlugin && (request.method! in filtersPlugin || ("ALL" in filtersPlugin && ["HEAD", "GET", "POST", "DELETE"].includes(request.method!)))) {
 				const filts = request.method! in filtersPlugin
 					? filtersPlugin[request.method! as keyof typeof filtersPlugin]
 					: filtersPlugin.ALL;
@@ -1160,7 +1160,7 @@ export const Utils = {
 						!paginationHandler[exclIncl]?.root && paginationHandler[exclIncl]?.sort && paginationHandler[exclIncl].sort in elem && keysToExclude.push(paginationHandler[exclIncl].sort);
 						!paginationHandler[exclIncl]?.root && paginationHandler[exclIncl]?.order && paginationHandler[exclIncl].order in elem && keysToExclude.push(paginationHandler[exclIncl].order);
 					}
-					if (!IS_PAG_EXCLUSIVE && paginationPlugin && (paginationPlugin[requestMethod! as keyof typeof paginationPlugin] || paginationPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!))) {
+					if (!IS_PAG_EXCLUSIVE && paginationPlugin && (paginationPlugin[requestMethod! as keyof typeof paginationPlugin] || (paginationPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!)))) {
 						const pag = requestMethod && requestMethod in paginationPlugin ? paginationPlugin[requestMethod as keyof typeof paginationPlugin] : paginationPlugin.ALL;
 						if (pag?.type === "body") {
 							pag.root && pag.root in elem && keysToExclude.push(pag.root);
@@ -1180,7 +1180,7 @@ export const Utils = {
 							}
 						})
 					}
-					if (!IS_FILT_EXCLUSIVE && filtersPlugin && (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || filtersPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!))) {
+					if (!IS_FILT_EXCLUSIVE && filtersPlugin && (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || (filtersPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!)))) {
 						const filters = (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || filtersPlugin.ALL);
 						filters && filters.filters.forEach(filter => {
 							if (filters.type === "body") {
@@ -1202,6 +1202,8 @@ export const Utils = {
 				let newBody: any = {};
 				const keys = Reflect.ownKeys(body);
 				const keysToExclude = [];
+				const IS_PAG_EXCLUSIVE = paginationHandler && paginationHandler !== "none" && "exclusive" in paginationHandler && paginationHandler.exclusive?.type === "body";
+				const IS_FILT_EXCLUSIVE = filtersHandler && filtersHandler !== "none" && "exclusive" in filtersHandler && filtersHandler.exclusive?.type === "body";
 				if (paginationHandler && paginationHandler !== "none" && (paginationHandler?.exclusive || paginationHandler?.inclusive)?.type === "body") {
 					const exclIncl = paginationHandler["exclusive"] || paginationHandler["inclusive"];
 					exclIncl?.root && exclIncl?.root in body && keysToExclude.push(exclIncl?.root);
@@ -1210,7 +1212,7 @@ export const Utils = {
 					!exclIncl?.root && exclIncl?.sort && exclIncl?.sort in body && keysToExclude.push(exclIncl?.sort);
 					!exclIncl?.root && exclIncl?.order && exclIncl?.order in body && keysToExclude.push(exclIncl?.order);
 				}
-				if (paginationPlugin && (paginationPlugin[requestMethod! as keyof typeof paginationPlugin] || paginationPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!))) {
+				if (!IS_PAG_EXCLUSIVE && paginationPlugin && (paginationPlugin[requestMethod! as keyof typeof paginationPlugin] || (paginationPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!)))) {
 					const pag = requestMethod && requestMethod in paginationPlugin ? paginationPlugin[requestMethod as keyof typeof paginationPlugin] : paginationPlugin.ALL;
 					if (pag?.type === "body") {
 						pag.root && pag.root in body && keysToExclude.push(pag.root);
@@ -1230,7 +1232,7 @@ export const Utils = {
 						}
 					})
 				}
-				if (filtersPlugin && (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || filtersPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!))) {
+				if (!IS_FILT_EXCLUSIVE && filtersPlugin && (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || (filtersPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!)))) {
 					const filters = (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || filtersPlugin.ALL);
 					filters && filters.filters.forEach(filter => {
 						if (filters.type === "body") {
