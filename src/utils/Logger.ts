@@ -42,10 +42,10 @@ export class Logger implements ILogger {
 	}
 
 	info(...msg: unknown[]): void {
-		["debug", "info", "warn"].includes(this.logLevel) && this.log(msg);
+		["debug", "info"].includes(this.logLevel) && this.log(msg);
 	}
 	success(...msg: unknown[]): void {
-		["debug", "info", "warn"].includes(this.logLevel) && this.log(msg, this.colors.green);
+		["debug", "info"].includes(this.logLevel) && this.log(msg, this.colors.green);
 	}
 	warn(...msg: unknown[]): void {
 		["debug", "info", "warn"].includes(this.logLevel) && this.log(msg, this.colors.yellow);
