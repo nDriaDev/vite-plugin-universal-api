@@ -292,12 +292,30 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 							}
 						}
 						if (HAS_DATA) {
-							if (!IS_JSON_CONTENT || !HAS_PAG_OR_FILT) {
-								throw new UniversalApiError(`File at ${fullUrl.pathname} already exists`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.CONFLICT);
+							if (!IS_JSON_CONTENT) {
+								throw new UniversalApiError(
+									`Content-Type must be application/json for POST requests to an existing file in ${IS_API_REST_FS ? "REST " : ""}File System API mode`,
+									"ERROR",
+									fullUrl.pathname,
+									Constants.HTTP_STATUS_CODE.UNSUPPORTED_MEDIA_TYPE
+								);
+							}
+							if (!HAS_PAG_OR_FILT) {
+								throw new UniversalApiError(
+									`File at ${fullUrl.pathname} already exists. Use PUT to replace it or PATCH to partially update it`,
+									"ERROR",
+									fullUrl.pathname,
+									Constants.HTTP_STATUS_CODE.CONFLICT
+								);
 							}
 							const bodyClean = Utils.request.getCleanBody(request.method, currentContent, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin);
 							if (bodyClean !== null) {
-								throw new UniversalApiError(`File at ${fullUrl.pathname} already exists`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.CONFLICT);
+								throw new UniversalApiError(
+									`File at ${fullUrl.pathname} already exists. The request body must contain only pagination/filter parameters`,
+									"ERROR",
+									fullUrl.pathname,
+									Constants.HTTP_STATUS_CODE.CONFLICT
+								);
 							}
 						}
 						result.data = dataFile.data;
@@ -325,7 +343,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 							throw new UniversalApiError(`No data provided`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 						}
 						if (HAS_PAG_OR_FILT) {
-							throw new UniversalApiError(`No data to filter or to paginate`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+							throw new UniversalApiError(`Cannot apply pagination or filters: resource at ${fullUrl.pathname} does not exist yet.`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 						}
 						result.status = Constants.HTTP_STATUS_CODE.CREATED;
 						writeFile = currentContent;
