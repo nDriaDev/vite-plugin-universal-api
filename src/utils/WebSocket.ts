@@ -77,11 +77,11 @@ export class WebSocketConnection implements IWebSocketConnection {
 	startHeartbeat(intervalMs: number) {
 		this.heartbeatInterval = setInterval(() => {
 			if (!this._closed) {
-				this.missedPongs++;
 				if (this.missedPongs >= this.MAX_MISSED_PONGS) {
 					this.close(1000, 'No pong received');
 					return;
 				}
+				this.missedPongs++;
 				this.ping('heartbeat');
 			}
 		}, intervalMs);
@@ -121,7 +121,11 @@ export class WebSocketConnection implements IWebSocketConnection {
 		if (this._closed || this.ws.readyState !== WsWebSocket.OPEN) {
 			return;
 		}
-		const payload = typeof data === 'string' ? data : JSON.stringify(data);
+		const payload = typeof data === 'string'
+			? data
+			: Buffer.isBuffer(data) || data instanceof Uint8Array
+				? data
+				: JSON.stringify(data);
 		return new Promise((resolve, reject) => {
 			this.ws.send(payload, (err) => {
 				if (err) reject(err);
@@ -141,8 +145,23 @@ export class WebSocketConnection implements IWebSocketConnection {
 		if (this.rooms.size === 0) {
 			this.manager.broadcast(data, { excludeId: includeSelf ? undefined : this.id });
 		} else {
+			const seen = new Set<string>();
 			this.rooms.forEach(room => {
-				this.manager.broadcast(data, { room, excludeId: includeSelf ? undefined : this.id });
+				this.manager.getByRoom(room).forEach(conn => {
+					if (seen.has(conn.id)) {
+						return;
+					}
+					if (!includeSelf && conn.id === this.id) {
+						return;
+					}
+					if (conn.closed) {
+						return;
+					}
+					seen.add(conn.id);
+					conn.send(data).catch(err =>
+						this.logger.error('[WebSocket] broadcastAllRooms error:', err)
+					);
+				});
 			});
 		}
 	}
@@ -180,7 +199,6 @@ export class WebSocketConnection implements IWebSocketConnection {
 		this._closed = true;
 		this.stopHeartbeat();
 		this.stopInactivityTimeout();
-		this.manager.remove(this.id);
 		return new Promise((resolve) => {
 			// INFO Resolve once the underlying socket fully closes after the handshake
 			this.ws.once('close', () => resolve());
