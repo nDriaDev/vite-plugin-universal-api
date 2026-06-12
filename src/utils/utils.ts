@@ -1,5 +1,5 @@
 import { createReadStream, createWriteStream, PathLike } from "node:fs";
-import { mkdir, readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { ApiWsRestFsDataResponse, UniversalApiErrorMiddleware, UniversalApiRestFsHandler, UniversalApiMiddleware, UniversalApiOptions, UniversalApiOptionsRequired, UniversalApiParser, UniversalApiParserFunction, UniversalApiRequest } from "../models/plugin.model";
 import { ResolvedConfig } from "vite";
@@ -10,15 +10,29 @@ import { MimeType, MimeTypeExt } from "./MimeType";
 import { Constants } from "./constants";
 import { UniversalApiError } from "./Error";
 import { ILogger } from "../models/logger.model";
+import { randomBytes } from "node:crypto";
 
 function patchWalkPath(target: any, path: string) {
+	if (path === '' || path === '/') {
+		throw new UniversalApiError(
+			"PATCH body request malformed: cannot use root path for this operation",
+			"ERROR",
+			"",
+			Constants.HTTP_STATUS_CODE.BAD_REQUEST
+		);
+	}
     const segments = path.split('/').filter(s => s !== '');
     let current = target;
 
     for (let i = 0; i < segments.length - 1; i++) {
         const key = segments[i];
-		if (!(key in current)) {
-			throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+		if (Array.isArray(current)) {
+			const idx = parseInt(key, 10);
+			if (isNaN(idx) || idx < 0 || idx >= current.length) {
+				throw new UniversalApiError("PATCH body request malformed", "ERROR", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+			}
+		} else if (typeof current !== "object" || current === null || !(key in current)) {
+			throw new UniversalApiError("PATCH body request malformed", "ERROR", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 		}
         current = current[key];
     }
@@ -28,7 +42,9 @@ function patchWalkPath(target: any, path: string) {
 }
 
 function patchGetValue(obj: any, path: string) {
-    if (path === '' || path === '/') return obj;
+	if (path === '' || path === '/') {
+		return obj;
+	}
     const { parent, key } = patchWalkPath(obj, path);
     return parent[key];
 }
@@ -48,8 +64,10 @@ export const Utils = {
 			}
 		},
         initOptions(opts: UniversalApiOptions | undefined, config: ResolvedConfig): UniversalApiOptionsRequired {
-            const fullFsDir = join(config.root, opts?.fsDir ?? "");
-            const endpointPrefix = opts?.endpointPrefix
+			const fullFsDir = opts?.fsDir != null
+				? join(config.root, opts.fsDir)
+				: null;
+			const endpointPrefix = opts?.endpointPrefix
                 ? Array.isArray(opts.endpointPrefix) && opts.endpointPrefix.length > 0
                     ? opts.endpointPrefix.map(el => {
                         let endpoint = Utils.request.addSlash(el, "leading");
@@ -76,7 +94,8 @@ export const Utils = {
                 wsHandlers: opts?.wsHandlers ?? [],
                 pagination: opts?.pagination ?? null,
                 filters: opts?.filters ?? null,
-                config,
+				disablePureFsApi: opts?.disablePureFsApi ?? false,
+				config,
                 matcher: new AntPathMatcher()
             };
 		},
@@ -147,22 +166,23 @@ export const Utils = {
 			const { promise, reject, resolve } = Utils.plugin.promiseWithResolver<void>();
 			const stream = createWriteStream(s, options);
 			stream.on('error', reject);
-			stream.on('finish', ()=> resolve());
+			stream.on('finish', () => resolve());
 			stream.write(data, "utf-8");
 			stream.end();
 			return promise;
 		},
         async writingFile(s: string, fileFound: boolean, data: any, mimeType: MimeType | null, withStream: boolean) {
 			const { dir, ext } = parsePath(s);
-			let file, path = s, options = {};
+			let file, path = s, options: any = {};
+			const effectiveDir = dir || process.cwd();
 			if (!fileFound) {
-				await Utils.files.createDir(dir);
+				await Utils.files.createDir(effectiveDir);
 			}
 			if (!ext && mimeType != null) {
 				const extFile = MimeTypeExt[mimeType];
 				path += `${extFile ? extFile : typeof data === "string" ? ".txt" : ""}`;
 			}
-			if (mimeType != null && mimeType.toString() === MimeType[".json"] || !!ext && ext === MimeTypeExt["application/json"]) {
+			if ((mimeType != null && mimeType.toString() === MimeType[".json"]) || (!!ext && ext === MimeTypeExt["application/json"])) {
 				file = JSON.stringify(data, null, 2);
 				options = { encoding: "utf-8" };
 			} else {
@@ -174,24 +194,38 @@ export const Utils = {
 					typeof data === "string" && (options = { encoding: "utf-8" });
 				}
 			}
-			withStream
-				? await this.writingStreamFile(path, file, options)
-				: await writeFile(path, file, options);
+			const tmpPath = join(effectiveDir, `.~${randomBytes(6).toString("hex")}.tmp`);
+			try {
+				if (withStream) {
+					await this.writingStreamFile(tmpPath, file, options);
+				} else {
+					await writeFile(tmpPath, file, options);
+				}
+				await rename(tmpPath, path);
+			} catch (err) {
+				await unlink(tmpPath).catch(() => undefined);
+				throw err;
+			}
         },
         async removeFile(s: PathLike) {
 			await unlink(s);
         },
-		getByteLength(data: any) {
-			let value;
-			try {
-				value = typeof data === "string"
-					? data
-					: JSON.stringify(data)
-			} catch (_) {
-				value = data;
+		getByteLength(data: any): number {
+			if (Buffer.isBuffer(data) || data instanceof Uint8Array) {
+				return data.byteLength;
 			}
-            return Buffer.byteLength(value, "utf-8");
-        },
+			if (typeof data === "string") {
+				return Buffer.byteLength(data, "utf-8");
+			}
+			if (data === undefined || data === null) {
+				return 0;
+			}
+			if (typeof data === "function" || typeof data === "symbol") {
+				throw new Error(`cannot compute Content-Length for ${typeof data}`);
+			}
+			const json = JSON.stringify(data);
+			return Buffer.byteLength(json, "utf-8");
+		},
 		/* v8 ignore start */
         isDeepEqual(objA: unknown, objB: unknown, map = new WeakMap()): boolean {
             if (Object.is(objA, objB)) {
@@ -259,13 +293,13 @@ export const Utils = {
 			} else {
 				// INFO RFC 6902 standard (JSON Patch)
 				if (!Array.isArray(patch)) {
-					throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+					throw new UniversalApiError("PATCH body request malformed", "ERROR", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 				}
 				result = Utils.plugin.cloneData(data);
 				patch.forEach(operation => {
 					const { op, path, value, from } = operation;
 					if (!op || !path) {
-						throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+						throw new UniversalApiError("PATCH body request malformed", "ERROR", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 					}
 					switch (op) {
 						case 'add': {
@@ -284,7 +318,7 @@ export const Utils = {
 								parent.splice(parseInt(key), 1);
 							} else {
 								if (!(key in parent)){
-									throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+									throw new UniversalApiError("PATCH body request malformed", "ERROR", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 								};
 								delete parent[key];
 							}
@@ -293,7 +327,7 @@ export const Utils = {
 						case 'replace': {
 							const { parent, key } = patchWalkPath(result, path);
 							if (!(key in parent)){
-								throw new UniversalApiError("PATCH body request malformed", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+								throw new UniversalApiError("PATCH body request malformed", "ERROR", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 							};
 							parent[key] = value;
 							break;
@@ -326,8 +360,20 @@ export const Utils = {
 							}
 							break;
 						}
+						case 'test': {
+							const currentVal = patchGetValue(result, path);
+							if (JSON.stringify(currentVal) !== JSON.stringify(value)) {
+								throw new UniversalApiError(
+									"PATCH test operation failed",
+									"ERROR",
+									"",
+									Constants.HTTP_STATUS_CODE.UNPROCESSABLE_ENTITY
+								);
+							}
+							break;
+						}
 						default:
-							throw new UniversalApiError(`PATCH operation not supported: ${op}`, "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+							throw new UniversalApiError(`PATCH operation not supported: ${op}`, "ERROR", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 					}
 				})
 			}
@@ -345,20 +391,22 @@ export const Utils = {
             }
             return newUrl;
         },
-        removeSlash(url: string, type: "leading" | "trailing" | "both") {
-            let newUrl = url;
-            if (["both", "leading"].includes(type)) {
-                newUrl.startsWith("/") && (newUrl = newUrl.substring(1));
-            }
-            if (["both", "trailing"].includes(type)) {
-                newUrl.endsWith("/") && (newUrl = newUrl.substring(0, newUrl.length - 1));
-            }
-            return newUrl;
-        },
-        buildFullUrl(req: IncomingMessage, config: ResolvedConfig): URL {
-			const host = typeof config.server.host === "string"
-				? config.server.host
-				: req.headers.host ?? "localhost";
+		removeSlash(url: string, type: "leading" | "trailing" | "both") {
+			let newUrl = url;
+			if (["both", "leading"].includes(type)) {
+				newUrl = newUrl.replace(/^\/+/, "");
+			}
+			if (["both", "trailing"].includes(type)) {
+				newUrl = newUrl.replace(/\/+$/, "");
+			}
+			return newUrl;
+		},
+		buildFullUrl(req: IncomingMessage, config: ResolvedConfig): URL {
+			const host = req.headers.host ?? (
+				typeof config.server.host === "string"
+					? config.server.host
+					: "localhost"
+			);
 			return new URL(req.url!, `http${config.server.https ? 's' : ''}://${host}`);
         },
 		matchesEndpointPrefix(url: string | undefined, prefixes: string[]) {
@@ -382,7 +430,18 @@ export const Utils = {
             }
             return url;
         },
-        async mergeBodyChunk(req: IncomingMessage): Promise<Buffer | null> {
+		async mergeBodyChunk(req: IncomingMessage): Promise<Buffer | null> {
+			if (req.readableEnded) {
+				return null;
+			}
+			if ((req as any).complete && req.readableLength > 0) {
+				const buffered: Buffer[] = [];
+				let chunk: Buffer | null;
+				while ((chunk = req.read() as Buffer | null) !== null) {
+					buffered.push(chunk);
+				}
+				return buffered.length > 0 ? Buffer.concat(buffered) : null;
+			}
 			const chunks: Buffer[] = [];
 			let receiveData = false;
 			const { promise, resolve, reject } = Utils.plugin.promiseWithResolver<Buffer | null>();
@@ -392,8 +451,8 @@ export const Utils = {
 				chunks.push(chunk);
 			});
 
-			req.on("error", () => {
-				reject(new Error("Error parsing request body"));
+			req.on("error", (err: Error) => {
+				reject(err);
 			});
 
 			req.on("end", () => {
@@ -410,127 +469,206 @@ export const Utils = {
 			request.query = new URLSearchParams();
 			return request;
 		},
+		indexOfBuffer(haystack: Buffer, needle: Buffer, offset = 0): number {
+			for (let i = offset; i <= haystack.length - needle.length; i++) {
+				if (haystack.subarray(i, i + needle.length).equals(needle)) {
+					return i;
+				}
+			}
+			return -1;
+		},
+		splitBufferByBoundary(buf: Buffer, boundary: Buffer, firstBoundary: Buffer): Buffer[] {
+			const parts: Buffer[] = [];
+			let start = this.indexOfBuffer(buf, firstBoundary);
+			if (start === -1) {
+				return parts;
+			}
+			start += firstBoundary.length;
+			// INFO skyp CRLF after boundary
+			if (buf[start] === 0x0d && buf[start + 1] === 0x0a) {
+				start += 2;
+			}
+			// INFO if it is terminator "--", stop
+			if (buf[start] === 0x2d && buf[start + 1] === 0x2d) {
+				return parts;
+			}
+			while (true) {
+				const nextBoundary = this.indexOfBuffer(buf, boundary, start);
+				if (nextBoundary === -1) {
+					break;
+				}
+				parts.push(buf.subarray(start, nextBoundary));
+				let next = nextBoundary + boundary.length;
+				// INFO check if it is terminator "--"
+				if (buf[next] === 0x2d && buf[next + 1] === 0x2d) {
+					break;
+				}
+				// INFO skip CRLF
+				if (buf[next] === 0x0d && buf[next + 1] === 0x0a) {
+					next += 2;
+				}
+				start = next;
+			}
+			return parts;
+		},
 		async parseRequest(request: UniversalApiRequest<any>, res: ServerResponse, fullUrl: URL, parserRequest: UniversalApiParser, logger: ILogger) {
 			try {
+				if (request.readableEnded) {
+					logger.debug("parseRequest: skipped (already parsed or stream ended)");
+					return;
+				}
 				if (parserRequest) {
 					logger.debug("parseRequest: START");
 					if (typeof parserRequest === "object") {
-						const { promise, reject, resolve } = Utils.plugin.promiseWithResolver<any>();
-						const next = (error?: any) => resolve(error);
-						let parserFunc: UniversalApiParserFunction[] = [];
-						if (!Array.isArray(parserRequest.parser)) {
-							parserFunc.push(parserRequest.parser);
-						} else {
-							parserFunc = parserRequest.parser;
+						const parserFuncs: UniversalApiParserFunction[] = Array.isArray(parserRequest.parser)
+							? parserRequest.parser
+							: [parserRequest.parser];
+						for (const fn of parserFuncs) {
+							await new Promise<void>((innerResolve, innerReject) => {
+								let settled = false;
+								const settle = (err?: any) => {
+									if (settled) return;
+									settled = true;
+									err ? innerReject(err) : innerResolve();
+								};
+								try {
+									const result = fn(request, res, (err?: any) => settle(err));
+									if (result && typeof (result as any).then === "function") {
+										(result as Promise<void>).then(() => settle()).catch(settle);
+									}
+								} catch (err) {
+									settle(err);
+								}
+							});
 						}
-						Promise.all(parserFunc.map(callbackfn => callbackfn(request, res, next))).then(() => resolve("done")).catch(reject);
-						await promise;
 						const { body, files, query } = parserRequest.transform(request);
-						body != undefined && (request.body = body);
-						files != undefined && (request.files = files);
-						query != undefined && (request.query = query);
+						if (body !== undefined) {
+							request.body = body;
+						}
+						if (files !== undefined) {
+							request.files = files;
+						}
+						if (query !== undefined) {
+							request.query = query;
+						}
 					} else {
 						const { query } = parse(request.url!, true);
-						let buildBody = false;
-						let body: unknown = null,
-							files: UniversalApiRequest<unknown>["files"] = null;
+						let body: unknown = null;
+						let files: UniversalApiRequest<unknown>["files"] = null;
+						let hasBody = false;
 						const mergedChunk: Buffer | null = await this.mergeBodyChunk(request);
-						const contentType = request.headers["content-type"];
+						const contentType = request.headers["content-type"] ?? "";
 						if (mergedChunk !== null) {
-							if (contentType?.includes("text") || ["application/json", "application/merge-patch+json", "application/json-patch+json"].includes(contentType || "") || contentType?.includes("application/x-www-form-urlencoded")) {
+							const isJson = contentType.includes("json");
+							const isText = contentType.includes("text");
+							const isUrlEncoded = contentType.includes("application/x-www-form-urlencoded");
+							const isMultipart = contentType.includes("multipart/form-data");
+
+							if (isText || isJson || isUrlEncoded) {
 								const bodyString = mergedChunk.toString("utf-8");
-								buildBody = true;
-								if (contentType?.includes("text")) {
+								hasBody = true;
+								if (isText) {
 									body = bodyString;
-								} else if (contentType?.includes("json")) {
+								} else if (isJson) {
 									try {
 										body = JSON.parse(bodyString);
-									} catch (_) {
+									} catch {
 										body = bodyString;
 									}
 								} else {
 									body = Object.fromEntries(new URLSearchParams(bodyString));
 								}
-							} else if (contentType?.includes('multipart/form-data')) {
-								body = {};
-								const boundary = contentType.split("boundary=")[1];
-								const boundaryStr = `--${boundary}`;
-								const bodyString = mergedChunk.toString("binary");
-								const trimmedBody = bodyString.trimEnd();
-								const cleanBody = trimmedBody.endsWith(`${boundaryStr}--`)
-									? trimmedBody.slice(0, -2)
-									: bodyString;
+							} else if (isMultipart) {
+								const parsedBody: Record<string, any> = {};
+								let hasMultipartFields = false;
+								const boundaryMatch = contentType.split("boundary=")[1];
 
-								const rawParts: string[] = cleanBody.split(boundaryStr).filter((part: string) => part.trim() !== '');
+								if (!boundaryMatch) {
+									throw new Error("multipart/form-data without boundary in Content-Type header.");
+								}
 
-								rawParts.forEach(part => {
-									const divider = '\r\n\r\n';
-									const dividerIndex = part.indexOf(divider);
+								const boundary = boundaryMatch.split(";")[0].trim();
+								const boundaryBuf = Buffer.from(`\r\n--${boundary}`);
+								const firstBoundaryBuf = Buffer.from(`--${boundary}`);
+								const parts = this.splitBufferByBoundary(mergedChunk, boundaryBuf, firstBoundaryBuf);
+
+								for (const part of parts) {
+									const divider = Buffer.from("\r\n\r\n");
+									const dividerIndex = this.indexOfBuffer(part, divider);
 									if (dividerIndex === -1) {
-										return;
+										continue;
 									}
-									const headersPart = part.substring(0, dividerIndex);
-									let bodyPartString = part.substring(dividerIndex + divider.length);
-									bodyPartString = bodyPartString.replace(/\r\n$/, "");
-									const headerLines = headersPart.trim().split("\r\n");
-									const partData: Record<string, string> = {};
-									headerLines.forEach(line => {
+									const headerBuf = part.slice(0, dividerIndex);
+									const bodyBuf = part.slice(dividerIndex + divider.length);
+
+									const partHeaders: Record<string, string> = {};
+									headerBuf.toString("utf-8").split("\r\n").forEach(line => {
 										const colonIndex = line.indexOf(": ");
 										if (colonIndex !== -1) {
-											const key = line.substring(0, colonIndex);
-											const value = line.substring(colonIndex + 2);
-											partData[key.toLowerCase()] = value;
+											partHeaders[line.substring(0, colonIndex).toLowerCase()] = line.substring(colonIndex + 2);
 										}
 									});
 
-									const disposition = partData["content-disposition"] || "";
-									const isFile = disposition.includes("filename=");
-
-									const partBuffer = Buffer.from(bodyPartString, "binary");
+									const disposition = partHeaders["content-disposition"] ?? "";
+									const partContentType = partHeaders["content-type"] ?? "";
 									const name = disposition.match(/name="([^"]+)"/)?.[1];
 									const filename = disposition.match(/filename="([^"]+)"/)?.[1];
-									const partContentType = partData["content-type"] || "";
-									let finalContent: any = partBuffer;
-									// INFO JSON file are writed as JSON, text as string
-									if (partContentType.includes("application/json")) {
-										try {
-											finalContent = JSON.parse(partBuffer.toString("utf-8").trim());
-										} catch (_) {
-											finalContent = partBuffer.toString("utf-8");
-										}
-									} else if (partContentType.includes("text/") || !isFile) {
-										finalContent = partBuffer.toString("utf-8");
-									}
+									const isFile = filename !== undefined;
+
 									if (isFile) {
-										!files && (files = []);
+										let fileContent: Buffer | unknown = bodyBuf;
+										if (partContentType.includes("application/json")) {
+											try {
+												fileContent = JSON.parse(bodyBuf.toString("utf-8").trim());
+											} catch {
+												fileContent = bodyBuf.toString("utf-8");
+											}
+										} else if (partContentType.includes("text/")) {
+											fileContent = bodyBuf.toString("utf-8");
+										}
+										files ??= [];
 										files.push({
-											name: filename!,
-											content: finalContent,
+											name: filename,
+											content: fileContent as Buffer<ArrayBuffer>,
 											contentType: partContentType || "application/octet-stream"
 										});
+									} else if (name) {
+										if (partContentType.includes("application/json")) {
+											try {
+												parsedBody[name] = JSON.parse(bodyBuf.toString("utf-8").trim());
+											} catch {
+												parsedBody[name] = bodyBuf.toString("utf-8");
+											}
+										} else {
+											parsedBody[name] = bodyBuf.toString("utf-8");
+										}
+										hasMultipartFields = true;
 									} else {
-										(body as Record<string, any>)[name ?? ''] = finalContent;
-										buildBody = true;
+										logger.debug("parseRequest: multipart part ignored, Content-Disposition missing or has no name");
 									}
-								});
+								}
+								body = hasMultipartFields ? parsedBody : null;
+								hasBody = hasMultipartFields || files !== null;
 							} else {
-								let parsed;
-								buildBody = true;
+								hasBody = true;
 								try {
-									parsed = mergedChunk.toString("utf-8");
-									body = JSON.parse(parsed.trim());
-								} catch (_) {
-									body = parsed ?? mergedChunk;
+									body = JSON.parse(mergedChunk.toString("utf-8").trim());
+								} catch {
+									body = mergedChunk;
 								}
 							}
 						}
 						request.query = new URLSearchParams();
 						if (query) {
 							Object.entries(query).forEach(([key, value]) => {
-								request.query.append(key, Array.isArray(value) ? value.join(",") : value ?? '');
+								if (Array.isArray(value)) {
+									value.forEach(v => request.query.append(key, v ?? ""));
+								} else {
+									request.query.append(key, value ?? "");
+								}
 							});
 						}
-						request.body = buildBody ? body : null;
+						request.body = hasBody ? body : null;
 						request.files = files;
 					}
 				} else {
@@ -538,11 +676,17 @@ export const Utils = {
 				}
 			} catch (error: any) {
 				logger.debug("parseRequest: ERROR - ", error);
-				throw new UniversalApiError("Error parsing request", "ERROR", fullUrl.pathname);
+				throw new UniversalApiError(
+					error instanceof Error ? error : new Error(String(error)),
+					"ERROR",
+					fullUrl.pathname
+				);
 			} finally {
-				!!parserRequest && logger.debug("parseRequest: END");
+				if (parserRequest) {
+					logger.debug("parseRequest: END");
+				}
 			}
-        },
+		},
         MiddlewaresChain() {
             const middlewares: UniversalApiMiddleware[] = [];
             const errorMiddlewares: UniversalApiErrorMiddleware[] = [];
@@ -580,8 +724,10 @@ export const Utils = {
 				}
 				try {
 					await next(error);
-					if (lastError && !res.writableEnded) {
-						throw lastError;
+					if (lastError) {
+						if (!res.writableEnded) {
+							throw lastError;
+						}
 					}
 				} catch (finalError: any) {
 					throw new UniversalApiError(finalError, "ERROR_MIDDLEWARE", "", Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR);
@@ -601,9 +747,9 @@ export const Utils = {
 		},
 		hasPaginationOrFilters(method: UniversalApiRequest<any>["method"], paginationPlugin: UniversalApiOptionsRequired["pagination"], filterPlugin: UniversalApiOptionsRequired["filters"], paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"]) {
 			return (!!paginationHandler && paginationHandler !== "none")
-				|| (!!filtersHandler && filtersHandler !== null)
-				|| (paginationPlugin !== null && (method! in paginationPlugin || "ALL" in paginationPlugin))
-				|| (filterPlugin !== null && (method! in filterPlugin || "ALL" in filterPlugin))
+				|| (!!filtersHandler && filtersHandler !== "none")
+				|| (paginationPlugin != null && (method! in paginationPlugin || "ALL" in paginationPlugin))
+				|| (filterPlugin != null && (method! in filterPlugin || "ALL" in filterPlugin))
 		},
         getPaginationAndFilters(request: UniversalApiRequest<any>, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"]): { pagination: null | { limit: null | number, skip: null | number, sort: null | string, order: null | string }, filters: null | { key: string, value: any, comparison: string, regexFlags?: string }[] } {
             const result: { pagination: null | { limit: null | number, skip: null | number, sort: null | string, order: null | string }, filters: null | { key: string, value: any, comparison: string, regexFlags?: string }[] } = {
@@ -612,7 +758,7 @@ export const Utils = {
             }
             let pagPlugin: typeof result.pagination = null;
             let filtPlugin: typeof result.filters = null;
-            if (!!paginationPlugin && (request.method! in paginationPlugin || "ALL" in paginationPlugin && ["HEAD", "GET", "POST", "DELETE"].includes(request.method!))) {
+			if (!!paginationPlugin && (request.method! in paginationPlugin || ("ALL" in paginationPlugin && ["HEAD", "GET", "POST", "DELETE"].includes(request.method!)))) {
                 const pag = request.method! in paginationPlugin
                     ? paginationPlugin[request.method! as keyof typeof paginationPlugin]
 					: paginationPlugin.ALL;
@@ -693,7 +839,7 @@ export const Utils = {
 					}
 				}
             }
-            if (!!filtersPlugin && (request.method! in filtersPlugin || "ALL" in filtersPlugin && ["HEAD", "GET", "POST", "DELETE"].includes(request.method!))) {
+			if (!!filtersPlugin && (request.method! in filtersPlugin || ("ALL" in filtersPlugin && ["HEAD", "GET", "POST", "DELETE"].includes(request.method!)))) {
                 const filts = request.method! in filtersPlugin
                     ? filtersPlugin[request.method! as keyof typeof filtersPlugin]
 					: filtersPlugin.ALL;
@@ -825,6 +971,9 @@ export const Utils = {
 								...pagPlugin
 							}
 						);
+					} else if (!paginationHandler.exclusive) {
+						// INFO Neither exclusive nor inclusive is set — fall back to plugin-level pagination.
+						pagPlugin != null && (result.pagination = { ...pagPlugin });
 					}
 					if ([limit, skip, order, sort].some(el => el !== null)) {
 						if (result.pagination !== null) {
@@ -895,7 +1044,7 @@ export const Utils = {
 								key: `${filtersHandler[exclIncl]?.root ? filtersHandler[exclIncl].root + "." : ""}${filt.key}`,
 								value,
 								comparison: filt.comparison,
-								...(filt.regexFlags ? {regexFlags: filt.regexFlags} : {})
+								...(filt.regexFlags ? { regexFlags: filt.regexFlags } : {})
 							});
 						}
 					});
@@ -913,9 +1062,12 @@ export const Utils = {
             return result;
 		},
 		applyPaginationAndFilters(request: UniversalApiRequest<any>, paginationHandler: UniversalApiRestFsHandler["pagination"], filtersHandler: UniversalApiRestFsHandler["filters"], paginationPlugin: UniversalApiOptions["pagination"], filtersPlugin: UniversalApiOptions["filters"], dataFile: { originalData: any, data: any, mimeType: string, total: number}) {
-			const data = JSON.parse(dataFile.data);
-			dataFile.originalData = JSON.parse(dataFile.data);
-			dataFile.data = data;
+			if (typeof dataFile.data === "string") {
+				dataFile.data = JSON.parse(dataFile.data);
+			}
+			if (dataFile.originalData === null || dataFile.originalData === undefined || typeof dataFile.originalData === "string") {
+				dataFile.originalData = Utils.plugin.cloneData(dataFile.data);
+			}
 			const IS_ARRAY = Array.isArray(dataFile.data);
 			if (![null, undefined].includes(dataFile.data)) {
 				const { pagination, filters } = this.getPaginationAndFilters(request, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin);
@@ -970,6 +1122,9 @@ export const Utils = {
 								case "regex":
 									result = RegExp(filter.value, filter.regexFlags || "").test(String(value))
 									break;
+								default:
+									result = false;
+									break;
 							}
 							return result;
 						});
@@ -978,7 +1133,7 @@ export const Utils = {
 				if (pagination !== null && Array.isArray(dataFile.data)) {
 					if (pagination.sort !== null && pagination.order !== null) {
 						if (!["ASC", "DESC", "1", "-1", "true", "false"].includes(pagination.order)) {
-							throw new UniversalApiError("Error parsing pagination request", "MANUALLY_HANDLED", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+							throw new UniversalApiError("Error parsing pagination request", "ERROR", "", Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 						}
 						dataFile.data = dataFile.data.sort((a: any, b: any) => {
 							return ["ASC", "1", "true"].includes(pagination.order!)
@@ -1032,7 +1187,7 @@ export const Utils = {
                         }
                     }
                     if (filtersHandler && filtersHandler !== "none" && ((filtersHandler?.exclusive || filtersHandler?.inclusive)?.filters || []).length > 0) {
-						const filters = (filtersHandler.inclusive || filtersHandler.exclusive);
+						const filters = (filtersHandler.exclusive || filtersHandler.inclusive);
 						filters && filters.filters.forEach(filter => {
                             if (filters.type === "body") {
                                 filters.root && filters.root in elem && keysToExclude.push(filters.root);
@@ -1040,7 +1195,7 @@ export const Utils = {
                             }
                         })
                     }
-                    if (!IS_FILT_EXCLUSIVE && filtersPlugin && (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || filtersPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!))) {
+					if (!IS_FILT_EXCLUSIVE && filtersPlugin && (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || (filtersPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!)))) {
 						const filters = (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || filtersPlugin.ALL);
 						filters && filters.filters.forEach(filter => {
                             if (filters.type === "body") {
@@ -1062,15 +1217,17 @@ export const Utils = {
                 let newBody: any = {};
                 const keys = Reflect.ownKeys(body);
                 const keysToExclude = [];
-                if (paginationHandler && paginationHandler !== "none" && (paginationHandler?.exclusive || paginationHandler?.inclusive)?.type === "body") {
-                    const exclIncl = paginationHandler["exclusive" ] || paginationHandler["inclusive"];
+				const IS_PAG_EXCLUSIVE = paginationHandler && paginationHandler !== "none" && "exclusive" in paginationHandler && paginationHandler.exclusive?.type === "body";
+				const IS_FILT_EXCLUSIVE = filtersHandler && filtersHandler !== "none" && "exclusive" in filtersHandler && filtersHandler.exclusive?.type === "body";
+				if (paginationHandler && paginationHandler !== "none" && (paginationHandler?.exclusive || paginationHandler?.inclusive)?.type === "body") {
+					const exclIncl = paginationHandler["exclusive"] || paginationHandler["inclusive"];
                     exclIncl?.root && exclIncl?.root in body && keysToExclude.push(exclIncl?.root);
                     !exclIncl?.root && exclIncl?.limit && exclIncl?.limit in body && keysToExclude.push(exclIncl?.limit);
                     !exclIncl?.root && exclIncl?.skip && exclIncl?.skip in body && keysToExclude.push(exclIncl?.skip);
                     !exclIncl?.root && exclIncl?.sort && exclIncl?.sort in body && keysToExclude.push(exclIncl?.sort);
                     !exclIncl?.root && exclIncl?.order && exclIncl?.order in body && keysToExclude.push(exclIncl?.order);
                 }
-                if (paginationPlugin && (paginationPlugin[requestMethod! as keyof typeof paginationPlugin] || paginationPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!))) {
+				if (!IS_PAG_EXCLUSIVE && paginationPlugin && (paginationPlugin[requestMethod! as keyof typeof paginationPlugin] || (paginationPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!)))) {
                     const pag = requestMethod && requestMethod in paginationPlugin ? paginationPlugin[requestMethod as keyof typeof paginationPlugin] : paginationPlugin.ALL;
                     if (pag?.type === "body") {
                         pag.root && pag.root in body && keysToExclude.push(pag.root);
@@ -1081,7 +1238,7 @@ export const Utils = {
                     }
                 }
                 if (filtersHandler && filtersHandler !== "none" && ((filtersHandler?.exclusive || filtersHandler?.inclusive)?.filters || []).length > 0) {
-					const filters = (filtersHandler.inclusive || filtersHandler.exclusive);
+					const filters = (filtersHandler.exclusive || filtersHandler.inclusive);
 					filters && filters.filters.forEach(filter => {
                         if (filters.type === "body") {
                             filters.root && filters.root in body && keysToExclude.push(filters.root);
@@ -1089,7 +1246,7 @@ export const Utils = {
                         }
                     })
                 }
-                if (filtersPlugin && (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || filtersPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!))) {
+				if (!IS_FILT_EXCLUSIVE && filtersPlugin && (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || (filtersPlugin.ALL && ["HEAD", "GET", "POST", "DELETE"].includes(requestMethod!)))) {
 					const filters = (filtersPlugin[requestMethod! as keyof typeof filtersPlugin] || filtersPlugin.ALL);
 					filters && filters.filters.forEach(filter => {
                         if (filters.type === "body") {
@@ -1103,7 +1260,8 @@ export const Utils = {
                 }
                 Reflect.ownKeys(newBody).length === 0 && (newBody = null);
                 return newBody;
-            }
+			}
+			return body;
 		},
 		/* v8 ignore start */
 		getBodyOtherData(originalBody: any, bodyClean: any, contentType: string) {
