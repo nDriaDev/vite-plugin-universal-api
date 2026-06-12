@@ -1,8 +1,8 @@
 /** @internal */
 export interface ILogger {
-    debug(...msg: string[]): void;
-    info(...msg: string[]): void;
-    success(...msg: string[]): void;
-    warn(...msg: string[]): void;
-    error(...msg: string[]): void;
+    debug(...msg: unknown[]): void;
+    info(...msg: unknown[]): void;
+    success(...msg: unknown[]): void;
+    warn(...msg: unknown[]): void;
+    error(...msg: unknown[]): void;
 }

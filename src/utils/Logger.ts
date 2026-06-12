@@ -17,24 +17,40 @@ export class Logger implements ILogger {
 		this.logLevel = logLevel;
 	}
 
-	private log(msg: string[], prefix: string = "") {
-		this.logLevel !== "silent" && process.stdout.write(`${prefix}${this.packageName}${prefix ? this.colors.reset : ''} ${msg.join(" ")}\n`);
+	private serialize(value: unknown): string {
+		if (value instanceof Error) {
+			return value.stack ?? `${value.name}: ${value.message}`;
+		}
+		if (typeof value === "string") {
+			return value;
+		}
+		try {
+			return JSON.stringify(value);
+		} catch {
+			return String(value);
+		}
 	}
 
-	debug(...msg: string[]): void {
-		this.logLevel === "debug" && this.log(msg, this.colors.debug);
+	private log(msg: unknown[], prefix: string = "", isError = false) {
+		if (this.logLevel === "silent") return;
+		const stream = isError ? process.stderr : process.stdout;
+		stream.write(`${prefix}${this.packageName}${prefix ? this.colors.reset : ''} ${msg.map(m => this.serialize(m)).join(" ")}\n`);
 	}
 
-	info(...msg: string[]): void {
-		["debug", "info", "warn"].includes(this.logLevel) && this.log(msg);
+	debug(...msg: unknown[]): void {
+		this.logLevel === "debug" && this.log(msg, this.colors.debug, false);
 	}
-	success(...msg: string[]): void {
-		["debug", "info", "warn"].includes(this.logLevel) && this.log(msg, this.colors.green);
+
+	info(...msg: unknown[]): void {
+		["debug", "info"].includes(this.logLevel) && this.log(msg, undefined, false);
 	}
-	warn(...msg: string[]): void {
-		["debug", "info", "warn"].includes(this.logLevel) && this.log(msg, this.colors.yellow);
+	success(...msg: unknown[]): void {
+		["debug", "info"].includes(this.logLevel) && this.log(msg, this.colors.green, false);
 	}
-	error(...msg: string[]): void {
-		this.log(msg, this.colors.red);
+	warn(...msg: unknown[]): void {
+		["debug", "info", "warn"].includes(this.logLevel) && this.log(msg, this.colors.yellow, false);
+	}
+	error(...msg: unknown[]): void {
+		this.log(msg, this.colors.red, true);
 	}
 }
