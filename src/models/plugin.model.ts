@@ -1589,6 +1589,39 @@ type UniversalApiBaseOptions = {
 	fsDir?: string | null;
 
 	/**
+	 * Disable the **pure File-System API** — the automatic fallback that serves
+	 * files directly from `fsDir` when no REST handler matches an incoming
+	 * request.
+	 *
+	 * When `true`, only REST handlers explicitly configured with `handle: "FS"`
+	 * continue to read files from `fsDir`; every other unmatched request is
+	 * handled according to `noHandledRestFsRequestsAction` (default: `"404"`).
+	 *
+	 * This option has **no effect** on handlers whose `handle` property is set
+	 * to `"FS"` — those always keep their file-system behaviour regardless of
+	 * this flag.
+	 *
+	 * Setting `disablePureFsApi: true` is useful when you want precise, explicit
+	 * control over which endpoints are exposed without relying on the implicit
+	 * directory-to-route mapping.
+	 *
+	 * @default false
+	 *
+	 * @example
+	 * // Serve files only through explicitly declared FS handlers
+	 * {
+	 *   fsDir: './mock-data',
+	 *   disablePureFsApi: true,
+	 *   handlers: [
+	 *     { pattern: '/api/users', method: 'GET', handle: 'FS' }
+	 *   ]
+	 * }
+	 * // GET /api/users   → served from mock-data/api/users.json  ✓ (explicit FS handler)
+	 * // GET /api/orders  → 404 or forwarded                       ✓ (pure FS disabled)
+	 */
+	disablePureFsApi?: boolean;
+
+	/**
 	 * Enable the plugin in preview mode (`vite preview`).
 	 * When `false`, the plugin does not intercept requests in preview mode.
 	 *
