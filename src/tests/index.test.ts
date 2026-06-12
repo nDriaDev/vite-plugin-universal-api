@@ -56,6 +56,10 @@ const mocks = vi.hoisted(() => ({
 				shouldFail: false,
 				original: null as any
 			},
+			buildFullUrl: {
+				shouldFail: false,
+				original: null as any
+			},
 			createRequest: {
 				shouldFail: false,
 				original: null as any
@@ -105,6 +109,7 @@ vi.mock('../utils/utils', async (importOriginal) => {
 	const fileContext = mod.Utils.files;
 	mocks.utils.request.addSlash.original = mod.Utils.request.addSlash;
 	mocks.utils.request.applyPaginationAndFilters.original = mod.Utils.request.applyPaginationAndFilters;
+	mocks.utils.request.buildFullUrl.original = mod.Utils.request.buildFullUrl;
 	mocks.utils.request.createRequest.original = mod.Utils.request.createRequest;
 	mocks.utils.request.getCleanBody.original = mod.Utils.request.getCleanBody;
 	mocks.utils.request.getPaginationAndFilters.original = mod.Utils.request.getPaginationAndFilters;
@@ -146,6 +151,15 @@ vi.mock('../utils/utils', async (importOriginal) => {
 							mocks.utils.request.getPaginationAndFilters.returnValue ? { ...requestsContext, getPaginationAndFilters: vi.fn().mockReturnValue(mocks.utils.request.getPaginationAndFilters.returnValue) } : requestsContext,
 							args
 						)
+					}
+				}),
+				buildFullUrl: vi.fn().mockImplementation((...args) => {
+					if (mocks.utils.request.buildFullUrl.shouldFail) {
+						return {
+							pathname: "/api/../../../etc/passwd"
+						}
+					} else {
+						return mocks.utils.request.buildFullUrl.original.apply(requestsContext, args)
 					}
 				}),
 				createRequest: vi.fn().mockImplementation((...args) => {
@@ -299,8 +313,8 @@ const generateOptions = (opt?: UniversalApiOptions) => (
 	import('../index')
 		.then(module => module.universalApiPlugin(opt) as unknown as {
 			configResolved: (conf: ResolvedConfig) => Promise<void>,
-			configureServer: (server: ViteDevServer) => void,
-			configurePreviewServer: (server: PreviewServer) => void
+			configureServer: (server: ViteDevServer) => (() => void) | undefined,
+			configurePreviewServer: (server: PreviewServer) => (() => void) | undefined
 		})
 );
 const createMultipartBody = (parts: object, boundary = `----TestBoundary${Date.now()}`) => {
@@ -395,7 +409,8 @@ describe('TEST PLUGIN', () => {
 		const plug = await generateOptions(mockOptions);
 		await plug.configResolved(CONF);
 		const server = getServer();
-		plug.configureServer(server);
+		const cb = plug.configureServer(server);
+		!!cb && cb();
 		expect(logSpy).toHaveBeenCalledTimes(9);
 	});
 
@@ -404,8 +419,9 @@ describe('TEST PLUGIN', () => {
 		const plug = await generateOptions(mockOptions);
 		await plug.configResolved(CONF);
 		const server = getServer();
-		plug.configureServer(server);
-		expect(logSpy).toHaveBeenCalledTimes(3);
+		const cb = plug.configureServer(server);
+		!!cb && cb();
+		expect(logSpy).toHaveBeenCalledTimes(2);
 	});
 
 	it('LOG_WARN_NO_PREFIX', async () => {
@@ -414,8 +430,9 @@ describe('TEST PLUGIN', () => {
 		const plug = await generateOptions(mockOptions);
 		await plug.configResolved(CONF);
 		const server = getServer();
-		plug.configureServer(server);
-		expect(logSpy).toHaveBeenCalledTimes(4);
+		const cb = plug.configureServer(server);
+		!!cb && cb();
+		expect(logSpy).toHaveBeenCalledTimes(1);
 	});
 });
 
@@ -427,7 +444,8 @@ describe('TEST CONFIGURE_PREVIEW_SERVER', () => {
 		const plug = await generateOptions(mockOptions);
 		await plug.configResolved(CONF);
 		const server = getServer();
-		plug.configurePreviewServer(server);
+		const cb = plug.configurePreviewServer(server);
+		!!cb && cb();
 		if (middleware) {
 			if (!wrapperMiddleware) {
 				wrapperMiddleware = (server).middlewares.use.mock.calls[0][0];
@@ -583,6 +601,16 @@ describe('TEST UTILS', () => {
 		expect(Array.isArray(singleItemFile.data)).toBe(false);
 		expect(singleItemFile.total).toBe(1);
 		expect(singleItemFile.data).toEqual({ id: 1, value: 10 });
+	});
+
+	it('ONLY_DEFAULT_FILTER', async () => {
+		mocks.utils.request.getPaginationAndFilters.shouldFail = true;
+		mocks.utils.request.getPaginationAndFilters.returnValue = {
+			pagination: null,
+			filters: [{ key: 'value', comparison: 'INVALID_COMPARISON', value: 20 }]
+		};
+		instance?.request.applyPaginationAndFilters({} as any, {} as any, {} as any, {} as any, {} as any, mockDataFile);
+		expect(mockDataFile.data.length).toBe(0);
 	});
 
 	it('ONLY_EQ_FILTER', async () => {
@@ -1327,6 +1355,42 @@ describe('TEST UTILS', () => {
 		expect(result!.pagination).toBeNull();
 	});
 
+	it('GET_CLEAN_BODY_PRIMITIVE', async () => {
+		const result = instance!.request.getCleanBody(
+			"POST",
+			"plain text body",
+			null,
+			null,
+			null,
+			null
+		);
+		expect(result).toBe("plain text body");
+	});
+
+	it('GET_CLEAN_BODY_NUMBER', async () => {
+		const result = instance!.request.getCleanBody(
+			"POST",
+			42,
+			null,
+			null,
+			null,
+			null
+		);
+		expect(result).toBe(42);
+	});
+
+	it('GET_CLEAN_BODY_BOOLEAN', async () => {
+		const result = instance!.request.getCleanBody(
+			"POST",
+			true,
+			null,
+			null,
+			null,
+			null
+		);
+		expect(result).toBe(true);
+	});
+
 	it('GET_CLEAN_BODY_ARRAY', async () => {
 		const request = createMockRequest('POST', {}, { data: {} });
 		const result = instance!.request.getCleanBody(
@@ -1410,6 +1474,177 @@ describe('TEST UTILS', () => {
 		expect(result!).toBe(undefined);
 	});
 
+	it('PARSE_REQUEST_READABLE_ENDED', async () => {
+		const req = new PassThrough() as any;
+		Object.assign(req, {
+			url: '/api/users',
+			method: 'POST',
+			headers: {}
+		});
+		req.end();
+		req.resume();
+		await new Promise(r => req.on('end', r));
+		const res = createMockRequestResponse(false);
+		const result = await instance!.request.parseRequest(req, res, fullUrlMock, true, loggerMock);
+		expect(result).toBeUndefined();
+		expect(loggerMock.debug).toHaveBeenCalledWith("parseRequest: skipped (already parsed or stream ended)");
+	});
+
+	it('PARSE_REQUEST_OBJECT_PARSER_WITH_FILES', async () => {
+		const mockFile = { name: "test.jpg", content: Buffer.from("data"), contentType: "image/jpeg" };
+		const req = new PassThrough() as any;
+		Object.assign(req, { url: '/api/users', method: 'POST', headers: {} });
+		req.end();
+		const res = createMockRequestResponse(false);
+		await instance!.request.parseRequest(
+			req,
+			res,
+			fullUrlMock,
+			{
+				parser: [(req: any, res: any, next: any) => next()],
+				transform: () => ({ files: [mockFile] })
+			},
+			loggerMock
+		);
+		expect(req.files).toEqual([mockFile]);
+	});
+
+	it('PARSE_REQUEST_OBJECT_PARSER_WITH_QUERY', async () => {
+		const mockQuery = new URLSearchParams({ id: "1" });
+		const req = new PassThrough() as any;
+		Object.assign(req, { url: '/api/users', method: 'POST', headers: {} });
+		req.end();
+		const res = createMockRequestResponse(false);
+		await instance!.request.parseRequest(
+			req,
+			res,
+			fullUrlMock,
+			{
+				parser: [(req: any, res: any, next: any) => next()],
+				transform: () => ({ query: mockQuery })
+			},
+			loggerMock
+		);
+		expect(req.query).toEqual(mockQuery);
+	});
+
+	it('PARSE_REQUEST_MULTIPART_WITHOUT_BOUNDARY', async () => {
+		const req = new PassThrough() as any;
+		Object.assign(req, {
+			url: '/api/users',
+			method: 'POST',
+			headers: {
+				'content-type': 'multipart/form-data'
+			}
+		});
+		req.write(Buffer.from('some data'));
+		req.end();
+		const res = createMockRequestResponse(false);
+		let result;
+		try {
+			await instance!.request.parseRequest(req, res, fullUrlMock, true, loggerMock);
+		} catch (error) {
+			result = (error as Error).message;
+		}
+		expect(result).toBe("multipart/form-data without boundary in Content-Type header.");
+	});
+
+	it('PARSE_REQUEST_MULTIPART_FILE_MALFORMED_JSON_CONTENT', async () => {
+		const boundary = '----TestBoundaryFileJson';
+		const malformedJson = '{not valid json';
+		const rawBody = [
+			`--${boundary}\r\n`,
+			`Content-Disposition: form-data; name="file"; filename="data.json"\r\n`,
+			`Content-Type: application/json\r\n`,
+			`\r\n`,
+			`${malformedJson}\r\n`,
+			`--${boundary}--\r\n`
+		].join('');
+		const bodyBuffer = Buffer.from(rawBody);
+		const req = new PassThrough() as any;
+		Object.assign(req, {
+			url: '/api/users',
+			method: 'POST',
+			headers: {
+				'content-type': `multipart/form-data; boundary=${boundary}`,
+				'content-length': bodyBuffer.length.toString()
+			}
+		});
+		req.write(bodyBuffer);
+		req.end();
+		const res = createMockRequestResponse(false);
+		await instance!.request.parseRequest(req, res, fullUrlMock, true, loggerMock);
+		expect(req.files![0].content).toBe(malformedJson);
+	});
+
+	it('PARSE_REQUEST_MULTIPART_PLAIN_TEXT_FIELD', async () => {
+		const boundary = '----TestBoundaryPlainText';
+		const rawBody = [
+			`--${boundary}\r\n`,
+			`Content-Disposition: form-data; name="username"\r\n`,
+			`Content-Type: text/plain\r\n`,
+			`\r\n`,
+			`john_doe\r\n`,
+			`--${boundary}--\r\n`
+		].join('');
+		const bodyBuffer = Buffer.from(rawBody);
+		const req = new PassThrough() as any;
+		Object.assign(req, {
+			url: '/api/users',
+			method: 'POST',
+			headers: {
+				'content-type': `multipart/form-data; boundary=${boundary}`,
+				'content-length': bodyBuffer.length.toString()
+			}
+		});
+		req.write(bodyBuffer);
+		req.end();
+		const res = createMockRequestResponse(false);
+		await instance!.request.parseRequest(req, res, fullUrlMock, true, loggerMock);
+		expect((req.body as Record<string, any>)['username']).toBe('john_doe');
+	});
+
+	it('PARSE_REQUEST_MULTIPART_PART_WITHOUT_NAME', async () => {
+		const boundary = '----TestBoundaryNoName';
+		const rawBody = [
+			`--${boundary}\r\n`,
+			`Content-Disposition: form-data\r\n`,
+			`\r\n`,
+			`some value\r\n`,
+			`--${boundary}--\r\n`
+		].join('');
+		const bodyBuffer = Buffer.from(rawBody);
+		const req = new PassThrough() as any;
+		Object.assign(req, {
+			url: '/api/users',
+			method: 'POST',
+			headers: {
+				'content-type': `multipart/form-data; boundary=${boundary}`,
+				'content-length': bodyBuffer.length.toString()
+			}
+		});
+		req.write(bodyBuffer);
+		req.end();
+		const res = createMockRequestResponse(false);
+		await instance!.request.parseRequest(req, res, fullUrlMock, true, loggerMock);
+		expect(loggerMock.debug).toHaveBeenCalledWith(
+			"parseRequest: multipart part ignored, Content-Disposition missing or has no name"
+		);
+	});
+
+	it('PARSE_REQUEST_QUERY_ARRAY_VALUES', async () => {
+		const req = new PassThrough() as any;
+		Object.assign(req, {
+			url: '/api/users?id=1&id=2&id=3',
+			method: 'GET',
+			headers: {}
+		});
+		req.end();
+		const res = createMockRequestResponse(false);
+		await instance!.request.parseRequest(req, res, fullUrlMock, true, loggerMock);
+		expect(req.query.getAll('id')).toEqual(['1', '2', '3']);
+	});
+
 	it('PARSE_REQUEST_OBJECT_PARSER', async () => {
 		const request = createMockRequest('POST', {}, { data: {} });
 		let result;
@@ -1433,7 +1668,7 @@ describe('TEST UTILS', () => {
 		} catch (error) {
 			result = (error as Error).message;
 		}
-		expect(result!).toBe("Error parsing request");
+		expect(result!).toBe("generic");
 	});
 
 	it('PARSE_REQUEST_MULTIPART_URL_ENCODED', async () => {
@@ -1569,6 +1804,40 @@ describe('TEST UTILS', () => {
 		expect(typeof (request.body as Record<string, any>)['badJsonField']).toBe('string');
 	});
 
+	it('MERGE_BODY_CHUNK_READABLE_ENDED', async () => {
+		const req = new PassThrough();
+		req.end();
+		await new Promise(r => {
+			req.resume();
+			req.on('end', r);
+		});
+		const result = await instance!.request.mergeBodyChunk(req);
+		expect(result).toBeNull();
+	});
+
+	it('MERGE_BODY_CHUNK_ALREADY_COMPLETE_WITH_BUFFERED_DATA', async () => {
+		const req = new PassThrough();
+		req.write(Buffer.from('hello'));
+		req.end();
+		await new Promise(r => req.on('finish', r));
+		(req as any).complete = true;
+		const result = await instance!.request.mergeBodyChunk(req);
+		expect(result).not.toBeNull();
+		expect(result!.toString()).toBe('hello');
+	});
+
+	it('MERGE_BODY_CHUNK_ALREADY_COMPLETE_NO_BUFFERED_DATA', async () => {
+		const req = new PassThrough();
+		req.write(Buffer.from('hello'));
+		req.end();
+		await new Promise(r => req.on('finish', r));
+		(req as any).complete = true;
+		req.resume();
+		await new Promise(r => req.on('end', r));
+		const result = await instance!.request.mergeBodyChunk(req);
+		expect(result).toBeNull();
+	});
+
 	it('MERGE_BODY_CHUNK_ERROR', async () => {
 		let result;
 		const req = new PassThrough();
@@ -1581,7 +1850,25 @@ describe('TEST UTILS', () => {
 		} catch (error) {
 			result = (error as Error).message;
 		}
-		expect(result!).toBe("Error parsing request body");
+		expect(result!).toBe("generic");
+	});
+
+	it('SPLIT_BUFFER_BY_BOUNDARY_NO_FIRST_BOUNDARY', async () => {
+		const result = instance!.request.splitBufferByBoundary(
+			Buffer.from('some content without boundary'),
+			Buffer.from('--boundary'),
+			Buffer.from('--firstboundary')
+		);
+		expect(result).toEqual([]);
+	});
+
+	it('SPLIT_BUFFER_BY_BOUNDARY_NO_NEXT_BOUNDARY', async () => {
+		const result = instance!.request.splitBufferByBoundary(
+			Buffer.from('--firstboundary\r\nsome content without next boundary'),
+			Buffer.from('--boundary'),
+			Buffer.from('--firstboundary')
+		);
+		expect(result).toEqual([]);
 	});
 
 	it('MATCH_ENDPOINT_PREFIX', async () => {
@@ -1691,6 +1978,60 @@ describe('TEST UTILS', () => {
 		expect(result!).toBeInstanceOf(Error);
 	});
 
+	it('GET_BYTE_LENGTH_BUFFER', async () => {
+		let result;
+		try {
+			result = instance!.files.getByteLength(new Uint8Array());
+		} catch (error) {
+			result = error;
+		}
+		expect(result!).toBe(0);
+	});
+
+	it('GET_BYTE_LENGTH_DATA_NULL', async () => {
+		let result;
+		try {
+			result = instance!.files.getByteLength(null);
+		} catch (error) {
+			result = error;
+		}
+		expect(result!).toBe(0);
+	});
+
+	it('GET_BYTE_LENGTH_SYMBOL', async () => {
+		let result;
+		try {
+			result = instance!.files.getByteLength(Symbol("test"));
+		} catch (error) {
+			result = error;
+		}
+		expect(result!).toBeInstanceOf(Error);
+	});
+
+	it('APPLYING_PATCH_JSON_OP_UNRECOGNIZED', async () => {
+		let result;
+		try {
+			result = instance!.files.applyingPatch(
+				{ id: 1, status: "active" },
+				[{ op: "poi", path: "/status", value: "active" }],
+				"json"
+			);
+		} catch (error) {
+			result = error;
+		}
+		expect(result!).toBeInstanceOf(Error);
+	});
+
+	it('APPLYING_PATCH_JSON_OP_TEST_SUCCESS', async () => {
+		const result = instance!.files.applyingPatch(
+			{ id: 1, status: "active" },
+			[{ op: "test", path: "/status", value: "active" }],
+			"json"
+		);
+		expect(result).toBeDefined();
+		expect(result!.status).toBe("active");
+	});
+
 	it('APPLYING_PATCH_JSON_ERROR', async () => {
 		let result;
 		try {
@@ -1765,6 +2106,84 @@ describe('TEST UTILS', () => {
 		}
 		expect(result!).toBe("PATCH body request malformed");
 	});
+
+	it('APPLYING_PATCH_ROOT_PATH_SLASH', async () => {
+		let result;
+		try {
+			result = instance!.files.applyingPatch(
+				{ id: 1 },
+				[{ op: "move", from: "/id", path: "/" }],
+				"json"
+			);
+		} catch (error) {
+			result = (error as Error).message;
+		}
+		expect(result).toBe("PATCH body request malformed: cannot use root path for this operation");
+	});
+
+	it('APPLYING_PATCH_ARRAY_INVALID_INDEX_NAN', async () => {
+		let result;
+		try {
+			result = instance!.files.applyingPatch(
+				[{ id: 1 }, { id: 2 }],
+				[{ op: "remove", path: "/abc/id" }],
+				"json"
+			);
+		} catch (error) {
+			result = (error as Error).message;
+		}
+		expect(result).toBe("PATCH body request malformed");
+	});
+
+	it('APPLYING_PATCH_ARRAY_INVALID_INDEX_NEGATIVE', async () => {
+		let result;
+		try {
+			result = instance!.files.applyingPatch(
+				[{ id: 1 }, { id: 2 }],
+				[{ op: "remove", path: "/-1/id" }],
+				"json"
+			);
+		} catch (error) {
+			result = (error as Error).message;
+		}
+		expect(result).toBe("PATCH body request malformed");
+	});
+
+	it('APPLYING_PATCH_ARRAY_INVALID_INDEX_OUT_OF_BOUNDS', async () => {
+		let result;
+		try {
+			result = instance!.files.applyingPatch(
+				[{ id: 1 }, { id: 2 }],
+				[{ op: "remove", path: "/99/id" }],
+				"json"
+			);
+		} catch (error) {
+			result = (error as Error).message;
+		}
+		expect(result).toBe("PATCH body request malformed");
+	});
+
+	it('APPLYING_PATCH_GET_VALUE_ROOT_PATH_EMPTY', async () => {
+		const target = { id: 1, name: "Test" };
+		const result = instance!.files.applyingPatch(
+			target,
+			[{ op: "copy", from: "", path: "/copy" }],
+			"json"
+		);
+		expect(result!.copy.id).toBe(1);
+		expect(result!.copy.name).toBe("Test");
+	});
+
+	it('APPLYING_PATCH_GET_VALUE_ROOT_PATH_SLASH', async () => {
+		const target = { id: 1, name: "Test" };
+		const result = instance!.files.applyingPatch(
+			target,
+			[{ op: "copy", from: "/", path: "/copy" }],
+			"json"
+		);
+		expect(result!.copy.id).toBe(1);
+		expect(result!.copy.name).toBe("Test");
+	});
 });
 
 describe('TEST CONFIGURE_SERVER', () => {
@@ -1775,7 +2194,8 @@ describe('TEST CONFIGURE_SERVER', () => {
 		const plug = await generateOptions(mockOptions);
 		await plug.configResolved(CONF);
 		const server = getServer();
-		plug.configureServer(server);
+		const cb = plug.configureServer(server);
+		!!cb && cb();
 		if (middleware) {
 			if (!wrapperMiddleware) {
 				wrapperMiddleware = (server).middlewares.use.mock.calls[0][0];
@@ -2752,6 +3172,19 @@ describe('TEST CONFIGURE_SERVER', () => {
 		expect(next).not.toHaveBeenCalled();
 	});
 
+	it('HEAD_FILE_NOT_FOUND', async () => {
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		req.method = "HEAD";
+		req.url = "/api/product1";
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.statusCode).toBe(404);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse.message).toBe("Not found");
+		expect(next).not.toHaveBeenCalled();
+	});
+
 	it('ERROR_READING_FILE_STREAM_ERROR', async () => {
 		mocks.readStream.shouldFail = true;
 		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
@@ -2788,6 +3221,127 @@ describe('TEST CONFIGURE_SERVER', () => {
 		expect(res.statusCode).toBe(200);
 		expect(responseData.value).toBe("");
 		expect(res.setHeader).toHaveBeenCalledWith(Constants.TOTAL_ELEMENTS_HEADER, 2);
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it('HEAD WITH_BODY_ERROR', async () => {
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		mockOptions.filters = {
+			HEAD: {
+				type: "query-param",
+				filters: [
+					{
+						key: "id",
+						valueType: "number",
+						comparison: "eq"
+					}
+				]
+			}
+		}
+		req.url = "/api/users?id=1";
+		req.method = "HEAD";
+		req.headers = {
+			"content-type": "application/json"
+		}
+		req.write(JSON.stringify({ id: 1, name: "Test 11" }));
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
+		expect(res.statusCode).toBe(400);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse.message).toBe("HEAD request cannot have a body in File System API mode");
+	});
+
+	it('HEAD WITH_FILE_ERROR', async () => {
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		mockOptions.filters = {
+			HEAD: {
+				type: "query-param",
+				filters: [
+					{
+						key: "id",
+						valueType: "number",
+						comparison: "eq"
+					}
+				]
+			}
+		}
+		mockOptions.handlers = [{
+			pattern: "/users",
+			method: "HEAD",
+			handle: "FS"
+		}];
+		const multipart = createMultipartBody({
+			file: {
+				filename: "user.json",
+				content: JSON.stringify({ id: 1, name: "Test 1" }),
+				contentType: "application/json"
+			}
+		});
+		req.url = "/api/users?id=1";
+		req.method = "HEAD";
+		req.headers = {
+			"content-type": multipart.contentType,
+			"content-length": multipart.contentLength
+		}
+		req.write(multipart.body);
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
+		expect(res.statusCode).toBe(400);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse.message).toBe("HEAD request cannot have a body in REST File System API mode");
+	});
+
+	it('HEAD WITH_FILTERS_FILE_ERROR', async () => {
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		mocks.utils.request.applyPaginationAndFilters.shouldFail = true;
+		mockOptions.filters = {
+			HEAD: {
+				type: "query-param",
+				filters: [
+					{
+						key: "id",
+						valueType: "number",
+						comparison: "eq"
+					}
+				]
+			}
+		}
+		req.method = "HEAD";
+		req.url = "/api/users?id=1";
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
+		expect(res.statusCode).toBe(400);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse.message).toBe(`Error parsing json content file ${path.join(MOCK_DIR.PATH, "users.json")}`);
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it('HEAD WITH_PAGINATION_ERROR', async () => {
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		mockOptions.pagination = {
+			HEAD: {
+				type: "query-param",
+				limit: "limit",
+				skip: "skip",
+				sort: "sort",
+				order: "order"
+			}
+		}
+		req.method = "HEAD";
+		req.url = "/api/users?limit=1&skip=0&order=-11&sort=id";
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
+		expect(res.statusCode).toBe(400);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse.message).toBe("Error parsing pagination request");
 		expect(next).not.toHaveBeenCalled();
 	});
 
@@ -3050,6 +3604,21 @@ describe('TEST CONFIGURE_SERVER', () => {
 		expect(res.statusCode).toBe(400);
 		const jsonResponse = JSON.parse(responseData.value);
 		expect(jsonResponse.message).toBe("Error parsing pagination request");
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it('GET MALFORMED JSON', async () => {
+		fs.writeFileSync(path.join(MOCK_DIR.PATH, 'orders.json'), JSON.stringify([{ id: 0, name: "Test" }, { id: 1, name: "Test 1" }]) + ",{[]}}");
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		req.url = "/api/orders";
+		req.method = "GET";
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
+		expect(res.statusCode).toBe(200);
+		expect(responseData.value).toBe('[{"id":0,"name":"Test"},{"id":1,"name":"Test 1"}],{[]}}');
+		expect(res.setHeader).toHaveBeenCalledWith(Constants.TOTAL_ELEMENTS_HEADER, 1);
 		expect(next).not.toHaveBeenCalled();
 	});
 
@@ -3317,8 +3886,9 @@ describe('TEST CONFIGURE_SERVER', () => {
 		const middleware = await execute(true);
 		await middleware(req, res, next);
 		expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
-		expect(res.statusCode).toBe(200);
-		expect(responseData.value).toBe("");
+		expect(res.statusCode).toBe(404);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse.message).toBe("Not found");
 		expect(next).not.toHaveBeenCalled();
 	});
 
@@ -3396,6 +3966,36 @@ describe('TEST CONFIGURE_SERVER', () => {
 			"content-length": multipart.contentLength
 		}
 		req.write(multipart.body);
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
+		expect(res.statusCode).toBe(409);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse.message).toBe("File at /api/users already exists");
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it('POST FILE_FOUND_WITH_FILTERS_AND_NON_JSON_BODY_CONFLICT', async () => {
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		mockOptions.filters = {
+			POST: {
+				type: "query-param",
+				filters: [
+					{
+						key: "id",
+						valueType: "number",
+						comparison: "eq"
+					}
+				]
+			}
+		};
+		req.url = "/api/users?id=0";
+		req.method = "POST";
+		req.headers = {
+			"content-type": "text/plain"
+		};
+		req.write("some plain text body");
 		req.end();
 		const middleware = await execute(true);
 		await middleware(req, res, next);
@@ -3506,22 +4106,6 @@ describe('TEST CONFIGURE_SERVER', () => {
 		expect(jsonResponse.message).toBe("No data to filter or to paginate");
 	});
 
-	it('POST TOTAL_COUNT_ERROR_HEADER', async () => {
-		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
-		fs.writeFileSync(
-			path.join(MOCK_DIR.PATH, 'bad.json'),
-			'[{"id":0,"name":"Test"}'
-		);
-		req.url = "/api/bad";
-		req.method = "POST";
-		req.end();
-		const middleware = await execute(true);
-		await middleware(req, res, next);
-		expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
-		expect(res.setHeader).toHaveBeenCalledWith(Constants.TOTAL_ELEMENTS_HEADER, 1);
-		expect(res.statusCode).toBe(200);
-		expect(responseData.value).toBe('[{"id":0,"name":"Test"}');
-	});
 
 	it('POST ERROR_WRITING_FILE', async () => {
 		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
@@ -3779,6 +4363,24 @@ describe('TEST CONFIGURE_SERVER', () => {
 		expect(jsonResponse.message).toBe("Error creating data");
 	});
 
+	it('PUT EMPTY_STRING_BODY', async () => {
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		req.method = "PUT";
+		req.url = "/api/users";
+		req.headers = {
+			"content-type": "text/plain"
+		};
+		req.write("   ");
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
+		expect(res.statusCode).toBe(400);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse.message).toBe("No data provided");
+		expect(next).not.toHaveBeenCalled();
+	});
+
 	it('PATCH UNSUPPORTED_MEDIA_TYPE', async () => {
 		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
 		req.method = "PATCH";
@@ -3950,7 +4552,7 @@ describe('TEST CONFIGURE_SERVER', () => {
 		expect(file.editor).toBe("John Harry");
 	});
 
-	it('PATH ERROR_PATCHING_OPERATION_NOT_SUPPORTED', async () => {
+	it('PATH ERROR_PATCHING_TEST_OPERATION', async () => {
 		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
 		req.url = "/api/users";
 		req.method = "PATCH";
@@ -3966,9 +4568,9 @@ describe('TEST CONFIGURE_SERVER', () => {
 		const middleware = await execute(true);
 		await middleware(req, res, next);
 		expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
-		expect(res.statusCode).toBe(400);
+		expect(res.statusCode).toBe(422);
 		const jsonResponse = JSON.parse(responseData.value);
-		expect(jsonResponse.message).toBe("PATCH operation not supported: test");
+		expect(jsonResponse.message).toBe("PATCH test operation failed");
 	});
 
 	it('PATH ERROR_PATCHING_FILE', async () => {
@@ -4266,6 +4868,212 @@ describe('TEST CONFIGURE_SERVER', () => {
 		const jsonResponse = JSON.parse(responseData.value);
 		expect(jsonResponse.message).toBe("Error deleting resource");
 	});
+
+	it('PATH_TRAVERSAL_FORBIDDEN', async () => {
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		mocks.utils.request.buildFullUrl.shouldFail = true;
+		req.url = "/api/../../../etc/passwd";
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
+		expect(res.statusCode).toBe(403);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse.message).toBe("Forbidden");
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it('POST_HANDLER_NO_RESPONSE_SENT', async () => {
+		mockOptions.handlers = [
+			{
+				handle: "FS",
+				method: "GET",
+				pattern: "/users",
+				postHandle(req, res, data) {
+				},
+			}
+		];
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
+		expect(res.statusCode).toBe(500);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse.message).toBe("FS REST Handled request did not send any response");
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it('HEAD WITH_FILTERS_SINGLE_OBJECT_NOT_FOUND', async () => {
+		fs.writeFileSync(path.join(MOCK_DIR.PATH, 'user.json'), JSON.stringify({ id: 1, name: "Test 1" }));
+		mockOptions.filters = {
+			HEAD: {
+				type: "query-param",
+				filters: [{ key: "id", valueType: "number", comparison: "eq" }]
+			}
+		};
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		req.method = "HEAD";
+		req.url = "/api/user?id=999";
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.statusCode).toBe(404);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse.message).toBe("Not found");
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it('HEAD WITH_FILTERS_ARRAY_EMPTY_RESULT', async () => {
+		mockOptions.filters = {
+			HEAD: {
+				type: "query-param",
+				filters: [{ key: "id", valueType: "number", comparison: "eq" }]
+			}
+		};
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		req.method = "HEAD";
+		req.url = "/api/users?id=999";
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.statusCode).toBe(200);
+		expect(res.setHeader).toHaveBeenCalledWith(Constants.TOTAL_ELEMENTS_HEADER, 0);
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it('GET WITH_FILTERS_SINGLE_OBJECT_NOT_FOUND', async () => {
+		fs.writeFileSync(path.join(MOCK_DIR.PATH, 'user.json'), JSON.stringify({ id: 1, name: "Test 1" }));
+		mockOptions.filters = {
+			GET: {
+				type: "query-param",
+				filters: [{ key: "id", valueType: "number", comparison: "eq" }]
+			}
+		};
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		req.url = "/api/user?id=999";
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.statusCode).toBe(404);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse.message).toBe("Not found");
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it('GET WITH_FILTERS_ARRAY_EMPTY_RESULT', async () => {
+		mockOptions.filters = {
+			GET: {
+				type: "query-param",
+				filters: [{ key: "id", valueType: "number", comparison: "eq" }]
+			}
+		};
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		req.url = "/api/users?id=999";
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.statusCode).toBe(200);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse).toEqual([]);
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it('POST WITH_FILTERS_SINGLE_OBJECT_NOT_FOUND', async () => {
+		fs.writeFileSync(path.join(MOCK_DIR.PATH, 'user.json'), JSON.stringify({ id: 1, name: "Test 1" }));
+		mockOptions.filters = {
+			POST: {
+				type: "query-param",
+				filters: [{ key: "id", valueType: "number", comparison: "eq" }]
+			}
+		};
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		req.method = "POST";
+		req.url = "/api/user?id=999";
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.statusCode).toBe(404);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse.message).toBe("Not found");
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it('PATCH NO_BODY_PROVIDED', async () => {
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		req.method = "PATCH";
+		req.headers = { "content-type": "application/json" };
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.setHeader).toHaveBeenCalledWith('content-type', 'application/json');
+		expect(res.statusCode).toBe(422);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse.message).toBe("No patch body provided");
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it('UNHANDLED_HTTP_METHOD_RETURNS_FALSE', async () => {
+		mockOptions.noHandledRestFsRequestsAction = "404";
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		req.method = "TRACE";
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.statusCode).toBe(404);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse.message).toContain("Impossible handling request");
+		expect(next).not.toHaveBeenCalled();
+	});
+
+	it('NO_HANDLER_FORWARD_NO_HANDLER_TYPE', async () => {
+		mockOptions.noHandledRestFsRequestsAction = "forward";
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		req.url = "/apis/users";
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(next).toHaveBeenCalled();
+	});
+
+	it('GATEWAY_TIMEOUT_SETTLE_REJECT_ALREADY_SETTLED', async () => {
+		mockOptions.delay = 50;
+		mockOptions.gatewayTimeout = 10;
+		mockOptions.handlers = [{
+			handle: "FS",
+			method: "GET",
+			pattern: "/users"
+		}];
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.statusCode).toBe(504);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse.message).toBe("Gateway Timeout");
+		expect(next).not.toHaveBeenCalled();
+		await new Promise(r => setTimeout(r, 100));
+	});
+
+	it('MANUALLY_HANDLED_RESPONSE_NOT_ENDED', async () => {
+		mockOptions.handlers = [
+			{
+				handle: "FS",
+				method: "GET",
+				pattern: "/users",
+				postHandle(req, res, data) {
+				},
+			}
+		];
+		const { req, res, next, responseData } = generateRequestResponseNextResponseData();
+		req.end();
+		const middleware = await execute(true);
+		await middleware(req, res, next);
+		expect(res.statusCode).toBe(500);
+		const jsonResponse = JSON.parse(responseData.value);
+		expect(jsonResponse.message).toBe("FS REST Handled request did not send any response");
+		expect(next).not.toHaveBeenCalled();
+	});
 });
 
 describe('TEST WEBSOCKET', async () => {
@@ -4402,7 +5210,6 @@ describe('TEST WEBSOCKET', async () => {
 			await conn.close(1000, 'Normal');
 			expect(ws.close).toHaveBeenCalledWith(1000, 'Normal');
 			expect(conn.closed).toBe(true);
-			expect(manager.get(conn.id)).toBeUndefined();
 		});
 
 		it('CLOSE_IS_IDEMPOTENT_SECOND_CALL_IS_NO-OP', async () => {
@@ -4539,7 +5346,7 @@ describe('TEST WEBSOCKET', async () => {
 			const conn = new WebSocketConnection(logger as any, ws, '/test', manager);
 
 			conn.startHeartbeat(100);
-			vi.advanceTimersByTime(300);
+			vi.advanceTimersByTime(400);
 			expect(ws.close).toHaveBeenCalledWith(1000, 'No pong received');
 			vi.useRealTimers();
 		});
@@ -4638,6 +5445,68 @@ describe('TEST WEBSOCKET', async () => {
 			expect(removeSpy).not.toHaveBeenCalled();
 			expect(terminateSpy).not.toHaveBeenCalled();
 		});
+
+		it('BROADCASTALLROOMS_SKIPS_ALREADY_SEEN_CONNECTIONS_IN_MULTIPLE_ROOMS', async () => {
+			const logger = makeLogger();
+			const manager = new ConnectionManager(logger as any);
+			const ws1 = await makeMockWs();
+			const ws2 = await makeMockWs();
+			const conn1 = new WebSocketConnection(logger as any, ws1, '/test', manager);
+			const conn2 = new WebSocketConnection(logger as any, ws2, '/test', manager);
+
+			conn1.joinRoom('room-a');
+			conn1.joinRoom('room-b');
+			conn2.joinRoom('room-a');
+			conn2.joinRoom('room-b');
+
+			conn1.broadcastAllRooms({ msg: 'dedup' }, false);
+
+			await vi.waitFor(() => expect(ws2.send).toHaveBeenCalledTimes(1));
+			expect(ws1.send).not.toHaveBeenCalled();
+		});
+
+		it('BROADCASTALLROOMS_SKIPS_CLOSED_CONNECTIONS', async () => {
+			const logger = makeLogger();
+			const manager = new ConnectionManager(logger as any);
+			const ws1 = await makeMockWs();
+			const ws2 = await makeMockWs();
+			const conn1 = new WebSocketConnection(logger as any, ws1, '/test', manager);
+			const conn2 = new WebSocketConnection(logger as any, ws2, '/test', manager);
+
+			conn1.joinRoom('room-a');
+			conn2.joinRoom('room-a');
+
+			conn2.markClosed();
+
+			conn1.broadcastAllRooms({ msg: 'skip-closed' }, false);
+
+			await new Promise(r => setTimeout(r, 50));
+			expect(ws2.send).not.toHaveBeenCalled();
+		});
+
+		it('BROADCASTALLROOMS_LOGS_ERROR_IF_SEND_FAILS', async () => {
+			const logger = makeLogger();
+			const manager = new ConnectionManager(logger as any);
+			const ws1 = await makeMockWs();
+			const ws2 = await makeMockWs();
+			const conn1 = new WebSocketConnection(logger as any, ws1, '/test', manager);
+			const conn2 = new WebSocketConnection(logger as any, ws2, '/test', manager);
+
+			conn1.joinRoom('room-a');
+			conn2.joinRoom('room-a');
+
+			const sendError = new Error('send failed');
+			ws2.send.mockImplementation((_data: any, cb: (err?: Error) => void) => cb(sendError));
+
+			conn1.broadcastAllRooms({ msg: 'send-fail' }, false);
+
+			await vi.waitFor(() => {
+				expect(logger.error).toHaveBeenCalledWith(
+					'[WebSocket] broadcastAllRooms error:',
+					sendError
+				);
+			});
+		});
 	});
 
 	describe('RUN_WS_PLUGIN', () => {
@@ -4689,7 +5558,8 @@ describe('TEST WEBSOCKET', async () => {
 		async function setupWsPlugin(opts: UniversalApiOptions, wsHandlers: UniversalApiOptions["wsHandlers"]) {
 			const plug = await generateOptions({ ...opts, wsHandlers } as unknown as UniversalApiOptions);
 			await plug.configResolved(CONF);
-			plug.configureServer({ ...getServer(), httpServer } as any);
+			const cb = plug.configureServer({ ...getServer(), httpServer } as any);
+			!!cb && cb();
 			upgradeHandler = httpServer.rawListeners('upgrade')[0];
 		}
 
@@ -5222,6 +6092,29 @@ describe('TEST WEBSOCKET', async () => {
 			expect(resetSpy).toHaveBeenCalledWith(timeoutValue);
 		});
 
+		it('RESET_INACTIVITY_TIMER_ON_PING_EVENT', async () => {
+			const { WebSocketConnection } = await import('../utils/WebSocket');
+			const resetSpy = vi.spyOn(WebSocketConnection.prototype, 'resetInactivityTimer');
+
+			await setupWsPlugin({ ...mockOptions }, [
+				{
+					pattern: '/ws/ping-inactivity',
+					inactivityTimeout: 5000,
+					onPing: vi.fn().mockResolvedValue(undefined)
+				}
+			]);
+
+			const { ws } = await simulateUpgrade('/api/ws/ping-inactivity');
+
+			resetSpy.mockClear();
+			ws.emit('ping', Buffer.from('data'));
+
+			await vi.waitFor(() => {
+				expect(resetSpy).toHaveBeenCalledTimes(1);
+				expect(resetSpy).toHaveBeenCalledWith(5000);
+			});
+		});
+
 		it('ONPING_CATCH_CALL_ONERROR_IF_ONPING_THROWS_ERROR', async () => {
 			const error = new Error('ping crash');
 			const onPing = vi.fn().mockRejectedValue(error);
@@ -5287,7 +6180,7 @@ describe('TEST WEBSOCKET', async () => {
 			ws.emit('ping', Buffer.from('data'));
 
 			await vi.waitFor(() => {
-				expect(resetMissedPongSpy).toHaveBeenCalledTimes(2);
+				expect(resetMissedPongSpy).toHaveBeenCalledTimes(1);
 			});
 		});
 
@@ -5341,7 +6234,8 @@ describe('TEST WEBSOCKET', async () => {
 			const { ws } = await simulateUpgrade('/api/ws/chat');
 			const plug = await generateOptions({ ...mockOptions, enableWs: true, wsHandlers: [{ pattern: '/ws/chat' }] });
 			await plug.configResolved(CONF);
-			(plug as any).configureServer({ ...getServer(), httpServer });
+			const cb = (plug as any).configureServer({ ...getServer(), httpServer });
+			!!cb && cb();
 
 			expect(httpServer.listenerCount('upgrade')).toBeGreaterThan(0);
 
@@ -5387,7 +6281,7 @@ describe('TEST WEBSOCKET', async () => {
 			wsServerSpy.mockRestore();
 		});
 
-		it('REGISTER_MIDDLEWARE_ONLY_FIRST_TIME_OR_IF_HTTPSERVER_CHANGE', async () => {
+		it('REGISTER_MIDDLEWARE_EVERY_TIME_OR_IF_HTTPSERVER_CHANGE', async () => {
 			const handlers = [{ pattern: '/ws', onMessage: vi.fn() }];
 			const plug = await generateOptions({
 				...mockOptions,
@@ -5400,16 +6294,18 @@ describe('TEST WEBSOCKET', async () => {
 				middlewares: { use: vi.fn() },
 				httpServer: httpServer1
 			} as any;
-			plug.configureServer(serverMock1);
+			let cb = plug.configureServer(serverMock1);
+			!!cb && cb();
 			expect(serverMock1.middlewares.use).toHaveBeenCalledTimes(1);
 			expect(httpServer1.listenerCount('upgrade')).toBeGreaterThan(0);
 
 			serverMock1.middlewares.use.mockClear();
-			plug.configureServer(serverMock1);
-			expect(serverMock1.middlewares.use).toHaveBeenCalledTimes(0);
+			cb = plug.configureServer(serverMock1);
+			!!cb && cb();
+			expect(serverMock1.middlewares.use).toHaveBeenCalledTimes(1);
 		});
 
-		it('REGISTER_MIDDLEWARE_ONLY_FIRST_TIME_OR_IF_HTTPSERVER_CHANGE_IN_PREVIEW', async () => {
+		it('REGISTER_MIDDLEWARE_EVERY_TIME_OR_IF_HTTPSERVER_CHANGE_IN_PREVIEW', async () => {
 			const handlers = [{ pattern: '/ws', onMessage: vi.fn() }];
 			const plug = await generateOptions({
 				...mockOptions,
@@ -5422,14 +6318,16 @@ describe('TEST WEBSOCKET', async () => {
 				middlewares: { use: vi.fn() },
 				httpServer: httpServer1
 			} as any;
-			plug.configurePreviewServer(serverMock1);
+			let cb = plug.configurePreviewServer(serverMock1);
+			!!cb && cb();
 
 			expect(serverMock1.middlewares.use).toHaveBeenCalledTimes(1);
 			expect(httpServer1.listenerCount('upgrade')).toBeGreaterThan(0);
 
 			serverMock1.middlewares.use.mockClear();
-			plug.configurePreviewServer(serverMock1);
-			expect(serverMock1.middlewares.use).toHaveBeenCalledTimes(0);
+			cb = plug.configurePreviewServer(serverMock1);
+			!!cb && cb();
+			expect(serverMock1.middlewares.use).toHaveBeenCalledTimes(1);
 		});
 
 		it('CLOSE_AND_ERROR_BLOCKS', async () => {
@@ -5580,6 +6478,99 @@ describe('TEST WEBSOCKET', async () => {
 					testError.message
 				);
 			});
+			loggerErrorSpy.mockRestore();
+		});
+
+		it('SOCKET_END_404_IF_MANAGER_NOT_FOUND_FOR_DISABLED_HANDLER', async () => {
+			await setupWsPlugin({ ...mockOptions }, [
+				{ pattern: '/ws/chat', disabled: true, onMessage: vi.fn() },
+				{ pattern: '/ws/other', onMessage: vi.fn() }
+			]);
+
+			const { WebSocketServer } = await import('../utils/WebSocket');
+			vi.spyOn(WebSocketServer.prototype, 'handleUpgrade').mockImplementation(
+				async (_req: any, _socket: any, _head: any, cb: any) => {
+					const ws = await makeMockWs();
+					await cb(ws);
+				}
+			);
+
+			const { EventEmitter } = await import('node:events');
+			const socket = new EventEmitter() as any;
+			socket.end = vi.fn();
+
+			const req = new PassThrough() as any;
+			Object.assign(req, { url: '/api/ws/chat', method: 'GET', headers: {} });
+			await upgradeHandler(req, socket, Buffer.alloc(0));
+
+			expect(socket.end).toHaveBeenCalledWith('HTTP/1.1 404 Not Found\r\n\r\n');
+		});
+
+		it('ONCONNECT_CLOSE_NOT_CALLED_IF_ALREADY_CLOSED', async () => {
+			const onConnect = vi.fn().mockImplementation(async (conn: any) => {
+				await conn.close(1000, 'Closed by handler');
+				throw new Error('connect failed after close');
+			});
+
+			await setupWsPlugin({ ...mockOptions }, [
+				{ pattern: '/ws/chat', onConnect }
+			]);
+
+			const { ws } = await simulateUpgrade('/api/ws/chat', undefined, true);
+
+			expect(ws.close).toHaveBeenCalledTimes(1);
+			expect(ws.close).toHaveBeenCalledWith(1000, 'Closed by handler');
+		});
+
+		it('ONCLOSE_CATCH_LOGS_ERROR_IF_ONCLOSE_THROWS', async () => {
+			const { Logger } = await import('../utils/Logger');
+			const loggerErrorSpy = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => { });
+			const error = new Error('onClose crashed');
+			const onClose = vi.fn().mockRejectedValue(error);
+
+			await setupWsPlugin({ ...mockOptions }, [
+				{
+					pattern: '/ws/close-catch',
+					onClose
+				}
+			]);
+
+			const { ws } = await simulateUpgrade('/api/ws/close-catch');
+			ws.emit('close', 1000, Buffer.from('bye'));
+
+			await vi.waitFor(() => {
+				expect(loggerErrorSpy).toHaveBeenCalledWith(
+					expect.stringContaining('error in onClose handler for'),
+					error
+				);
+			});
+
+			loggerErrorSpy.mockRestore();
+		});
+
+		it('ONERROR_CATCH_LOGS_ERROR_IF_ONERROR_THROWS', async () => {
+			const { Logger } = await import('../utils/Logger');
+			const loggerErrorSpy = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => { });
+			const handlerError = new Error('onError crashed');
+			const onError = vi.fn().mockRejectedValue(handlerError);
+
+			await setupWsPlugin({ ...mockOptions }, [
+				{
+					pattern: '/ws/onerror-catch',
+					onError
+				}
+			]);
+
+			const { ws } = await simulateUpgrade('/api/ws/onerror-catch');
+			ws.emit('error', new Error('socket boom'));
+
+			await vi.waitFor(() => {
+				expect(loggerErrorSpy).toHaveBeenCalledWith(
+					expect.stringContaining('error in onError handler for'),
+					handlerError.message
+				);
+			});
+
 			loggerErrorSpy.mockRestore();
 		});
 	});

@@ -13,9 +13,9 @@
 [![npm downloads](https://img.shields.io/npm/dt/%40ndriadev/vite-plugin-universal-api?label=DOWNLOADS&style=for-the-badge&color=red)](https://www.npmjs.com/package/%40ndriadev/vite-plugin-universal-api)
 [![License: MIT](https://img.shields.io/badge/LICENSE-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-![Statements](https://img.shields.io/badge/statements-99.68%25-brightgreen.svg?style=for-the-badge)
-![Branches](https://img.shields.io/badge/branches-90.2%25-green.svg?style=for-the-badge)
-![Functions](https://img.shields.io/badge/functions-98.17%25-green.svg?style=for-the-badge)
+![Statements](https://img.shields.io/badge/statements-99.78%25-brightgreen.svg?style=for-the-badge)
+![Branches](https://img.shields.io/badge/branches-89.67%25-green.svg?style=for-the-badge)
+![Functions](https://img.shields.io/badge/functions-99.38%25-green.svg?style=for-the-badge)
 ![Lines](https://img.shields.io/badge/lines-100%25-brightgreen.svg?style=for-the-badge)
 
 *Built with:*
