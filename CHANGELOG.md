@@ -1,5 +1,27 @@
 ### [1.0.4](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v1.0.4) - 2026-02-09
 
+## [2.3.0](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v2.3.0) - 2026-06-12
+
+### Bug Fixes
+
+- types ([42b637b](https://github.com/nDriaDev/vite-plugin-universal-api/commit/42b637b))
+- attach plugin logic ([525dc3f](https://github.com/nDriaDev/vite-plugin-universal-api/commit/525dc3f))
+- general plugin implementation ([447ad42](https://github.com/nDriaDev/vite-plugin-universal-api/commit/447ad42))
+- websocket implementation ([708be22](https://github.com/nDriaDev/vite-plugin-universal-api/commit/708be22))
+- antpathmatcher ([0b18f44](https://github.com/nDriaDev/vite-plugin-universal-api/commit/0b18f44))
+- constant + mimetype ([e3b38d5](https://github.com/nDriaDev/vite-plugin-universal-api/commit/e3b38d5))
+- rework utils function ([33eec17](https://github.com/nDriaDev/vite-plugin-universal-api/commit/33eec17))
+- error class ([9ab0f96](https://github.com/nDriaDev/vite-plugin-universal-api/commit/9ab0f96))
+- logger log ([acc02d9](https://github.com/nDriaDev/vite-plugin-universal-api/commit/acc02d9))
+
+### Documentation
+
+- update docs ([e639857](https://github.com/nDriaDev/vite-plugin-universal-api/commit/e639857))
+
+### Other Changes
+
+- update test ([8f5364b](https://github.com/nDriaDev/vite-plugin-universal-api/commit/8f5364b))
+
 ## [2.2.0](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v2.2.0) - 2026-04-15
 
 ### Bug Fixes
