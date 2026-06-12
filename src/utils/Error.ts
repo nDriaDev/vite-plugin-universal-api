@@ -14,7 +14,7 @@ export class UniversalApiError extends Error implements IUniversalApiError {
         if (typeof e === "string") {
             super(e);
         } else {
-            super(e.message, { cause: e.cause });
+            super(e.message, { cause: e });
 			this.stack = `${this.name}: ${this.message}\nCaused by: ${e.stack}`;
 		}
 		this.type = type;
