@@ -2,7 +2,7 @@ import { IncomingMessage, ServerResponse } from "node:http";
 import { Connect, PreviewServer, ViteDevServer } from "vite";
 import { ApiWsRestFsDataResponse, UniversalApiRestFsHandler, UniversalApiOptionsRequired, UniversalApiRequest, HandledRequestData, UniversalApiWsHandler, UniversalApiAuthenticate } from "../models/plugin.model";
 import { Utils } from "./utils";
-import { join, parse } from "node:path";
+import { join, normalize, parse, resolve, sep } from "node:path";
 import { MimeType } from "./MimeType";
 import { Constants } from "./constants";
 import { AntPathMatcher } from "./AntPathMatcher";
@@ -90,7 +90,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 				return false;
 			}
 		}
-		handler === null && logger.info("Request handling with FS API");
+		handler === null && logger.debug("Request handling with FS API");
 		const dataFile: { originalData: any, data: any, mimeType: string, total: number } = {
 			total: 0,
 			data: null,
@@ -99,20 +99,23 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 		}
 		let url = fullUrl.pathname;
 		if (IS_API_REST_FS && handler.preHandle) {
-			let pathname = fullUrl.pathname;
 			if (Array.isArray(handler.preHandle.transform)) {
 				handler.preHandle.transform.forEach(({ searchValue, replaceValue }) => {
-					pathname = pathname.replace(searchValue, replaceValue);
+					url = url.replace(searchValue, replaceValue);
 				});
 			} else {
-				pathname = handler.preHandle.transform(pathname);
+				url = handler.preHandle.transform(url);
 			}
-			fullUrl.pathname = pathname;
-			url = fullUrl.pathname + fullUrl.search;
 		}
 
 		const endpointNoPrefix = Utils.request.removeSlash(Utils.request.removeEndpointPrefix(url, endpointPrefix), "trailing");
 		const filePath = join(fullFsDir, endpointNoPrefix);
+		const normalizedFilePath = normalize(resolve(filePath));
+		const normalizedFsDir = normalize(resolve(fullFsDir));
+
+		if (!normalizedFilePath.startsWith(normalizedFsDir + sep) && normalizedFilePath !== normalizedFsDir) {
+			throw new UniversalApiError("Forbidden", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.FORBIDDEN);
+		}
 		let file: string = filePath,
 			fileFound;
 		if (await Utils.files.isFileExists(filePath)) {
@@ -120,7 +123,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 			fileFound = true;
 		} else if (await Utils.files.isDirExists(filePath)) {
 			const files: string[] = await Utils.files.directoryFileList(filePath);
-			const fileIndex = files.find(el => el.startsWith("index.json")) ?? null;
+			const fileIndex = files.find(el => el === "index.json") ?? null;
 			if (fileIndex) {
 				fileFound = true;
 				file = join(filePath, fileIndex)
@@ -132,7 +135,11 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 			const lastSegmentPath = Utils.request.removeSlash(filePath.substring(pathBeforeLastSegment.length), "both");
 			if (lastSegmentPath !== "" && await Utils.files.isDirExists(pathBeforeLastSegment)) {
 				const files: string[] = await Utils.files.directoryFileList(pathBeforeLastSegment);
-				const fileExt = files.find(f => f.startsWith(lastSegmentPath)) ?? null;
+				const fileExt = files.find(f => {
+					const dotIdx = f.indexOf(".");
+					const baseName = dotIdx === -1 ? f : f.substring(0, dotIdx);
+					return baseName === lastSegmentPath;
+				}) ?? null;
 				if (fileExt) {
 					file = join(pathBeforeLastSegment, fileExt);
 					fileFound = true;
@@ -175,67 +182,138 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 		logger.debug("handlingApiFsRequest: request Method: ", request.method!);
 
 		switch (request.method!) {
-			case "HEAD":
-			case "GET":
-				if (fileFound) {
-					result.status = Constants.HTTP_STATUS_CODE.OK;
-					result.headers = [
-						...result.headers,
-						{ name: "content-type", value: dataFile.mimeType }
-					];
-					if (dataFile.data && dataFile.mimeType === MimeType[".json"]) {
-						if (Utils.request.hasPaginationOrFilters(request.method, paginationPlugin, filtersPlugin, paginationHandler, filtersHandler)) {
-							if (!IS_API_REST_FS) {
-								logger.debug("handlingApiFsRequest: parsing request");
-								await Utils.request.parseRequest(request, res, fullUrl, parser, logger);
-							}
-							if (request.body !== null || request.files !== null) {
-								throw new UniversalApiError(`${request.method} request cannot have a body in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
-							}
-							try {
-								logger.debug("handlingApiFsRequest: applying pagination and filters");
-								Utils.request.applyPaginationAndFilters(request, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin, dataFile);
-							} catch (error: any) {
-								if (error instanceof UniversalApiError) {
-									if (error.getType() === "MANUALLY_HANDLED") {
-										error.setType("ERROR");
-										error.setPath(fullUrl.pathname);
-									}
-									throw error;
-								}
-								logger.debug("handlingApiFsRequest: ERROR parsing json content file ", file!, error);
-								throw new UniversalApiError(`Error parsing json content file ${file}`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
-							}
-						} else {
-							try {
-								dataFile.data = JSON.parse(dataFile.data);
-								Array.isArray(dataFile.data) && (dataFile.total = dataFile.data.length);
-							} catch (_) {
-								dataFile.total = 1;
-							}
-						}
-						request.method === "GET" && (result.data = dataFile.data);
-						result.headers.push(
-							{ name: "content-length", value: Utils.files.getByteLength(dataFile.data) },
-							{ name: Constants.TOTAL_ELEMENTS_HEADER, value: dataFile.total }
-						);
-					} else {
-						throw new UniversalApiError(
-							file,
-							"READ_FILE",
-							fullUrl.pathname,
-							undefined,
-							{
-								headers: result.headers,
-								requ: request
-							}
-						);
-					}
-				} else {
+			case "HEAD": {
+				if (!fileFound) {
 					throw new UniversalApiError("Not found", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.NOT_FOUND);
 				}
+				result.status = Constants.HTTP_STATUS_CODE.OK;
+				result.headers.push({ name: "content-type", value: dataFile.mimeType });
+				if (dataFile.data && dataFile.mimeType === MimeType[".json"]) {
+					let parsedData: any;
+					if (Utils.request.hasPaginationOrFilters(request.method, paginationPlugin, filtersPlugin, paginationHandler, filtersHandler)) {
+						if (!IS_API_REST_FS) {
+							logger.debug("handlingApiFsRequest: parsing request");
+							await Utils.request.parseRequest(request, res, fullUrl, parser, logger);
+						}
+						if (request.files !== null) {
+							throw new UniversalApiError(`${request.method} request cannot have a body in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+						}
+						if (request.body !== null) {
+							const cleanBody = Utils.request.getCleanBody(request.method, request.body, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin);
+							if (cleanBody !== null) {
+								throw new UniversalApiError(`${request.method} request cannot have a body in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+							}
+						}
+						try {
+							logger.debug("handlingApiFsRequest: applying pagination and filters");
+							Utils.request.applyPaginationAndFilters(request, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin, dataFile);
+						} catch (error: any) {
+							if (error instanceof UniversalApiError) {
+								if (!error.getPath()) error.setPath(fullUrl.pathname);
+								throw error;
+							}
+							logger.debug("handlingApiFsRequest: ERROR parsing json content file ", file!, error);
+							throw new UniversalApiError(`Error parsing json content file ${file}`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+						}
+
+						const wasArray = Array.isArray(dataFile.originalData);
+						if (!wasArray && dataFile.data === null) {
+							throw new UniversalApiError("Not found", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.NOT_FOUND);
+						}
+						parsedData = wasArray ? (dataFile.data ?? []) : dataFile.data;
+						dataFile.total = wasArray
+							? (Array.isArray(dataFile.data) ? dataFile.data.length : 0)
+							: dataFile.data ? 1 : 0;
+					} else {
+						try {
+							parsedData = JSON.parse(dataFile.data);
+							Array.isArray(parsedData) && (dataFile.total = parsedData.length);
+						} catch (_) {
+							dataFile.total = 1;
+							parsedData = dataFile.data;
+						}
+					}
+					result.headers.push(
+						{ name: "content-length", value: Utils.files.getByteLength(parsedData) },
+						{ name: Constants.TOTAL_ELEMENTS_HEADER, value: dataFile.total }
+					);
+				} else {
+					throw new UniversalApiError(
+						file,
+						"READ_FILE",
+						fullUrl.pathname,
+						undefined,
+						{ headers: result.headers, requ: request }
+					);
+				}
 				break;
-			case "POST":
+			}
+			case "GET": {
+				if (!fileFound) {
+					throw new UniversalApiError("Not found", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.NOT_FOUND);
+				}
+				result.status = Constants.HTTP_STATUS_CODE.OK;
+				result.headers.push({ name: "content-type", value: dataFile.mimeType });
+				if (dataFile.data && dataFile.mimeType === MimeType[".json"]) {
+					if (Utils.request.hasPaginationOrFilters(request.method, paginationPlugin, filtersPlugin, paginationHandler, filtersHandler)) {
+						if (!IS_API_REST_FS) {
+							logger.debug("handlingApiFsRequest: parsing request");
+							await Utils.request.parseRequest(request, res, fullUrl, parser, logger);
+						}
+						if (request.files !== null) {
+							throw new UniversalApiError(`${request.method} request cannot have a body in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+						}
+						if (request.body !== null) {
+							const cleanBody = Utils.request.getCleanBody(request.method, request.body, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin);
+							if (cleanBody !== null) {
+								throw new UniversalApiError(`${request.method} request cannot have a body in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+							}
+						}
+						try {
+							logger.debug("handlingApiFsRequest: applying pagination and filters");
+							Utils.request.applyPaginationAndFilters(request, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin, dataFile);
+						} catch (error: any) {
+							if (error instanceof UniversalApiError) {
+								if (!error.getPath()) error.setPath(fullUrl.pathname);
+								throw error;
+							}
+							logger.debug("handlingApiFsRequest: ERROR parsing json content file ", file!, error);
+							throw new UniversalApiError(`Error parsing json content file ${file}`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+						}
+
+						const wasArray = Array.isArray(dataFile.originalData);
+						if (!wasArray && dataFile.data === null) {
+							throw new UniversalApiError("Not found", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.NOT_FOUND);
+						}
+						dataFile.data = wasArray ? (dataFile.data ?? []) : dataFile.data;
+						dataFile.total = wasArray
+							? (Array.isArray(dataFile.data) ? dataFile.data.length : 0)
+							: dataFile.data ? 1 : 0;
+					} else {
+						try {
+							dataFile.data = JSON.parse(dataFile.data);
+							Array.isArray(dataFile.data) && (dataFile.total = dataFile.data.length);
+						} catch (_) {
+							dataFile.total = 1;
+						}
+					}
+					result.data = dataFile.data;
+					result.headers.push(
+						{ name: "content-length", value: Utils.files.getByteLength(dataFile.data) },
+						{ name: Constants.TOTAL_ELEMENTS_HEADER, value: dataFile.total }
+					);
+				} else {
+					throw new UniversalApiError(
+						file,
+						"READ_FILE",
+						fullUrl.pathname,
+						undefined,
+						{ headers: result.headers, requ: request }
+					);
+				}
+				break;
+			}
+			case "POST": {
 				try {
 					if (!IS_API_REST_FS) {
 						logger.debug("handlingApiFsRequest: parsing request");
@@ -244,6 +322,10 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 					if (request.files !== null && request.files.length > 1) {
 						throw new UniversalApiError(`POST request with multiple file is not allowed in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 					}
+					if (request.body !== null && request.files !== null && request.files.length > 0) {
+						throw new UniversalApiError(`POST request with file and body is not allowed in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+					}
+
 					const HAS_BODY = request.body !== null;
 					const HAS_FILE = request.files !== null && request.files.length > 0;
 					const currentContent = HAS_BODY
@@ -257,51 +339,53 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 					const HAS_PAG_OR_FILT = Utils.request.hasPaginationOrFilters(request.method, paginationPlugin, filtersPlugin, paginationHandler, filtersHandler);
 					const IS_JSON_FILE = dataFile.mimeType === MimeType[".json"];
 
-					if (HAS_BODY && HAS_FILE) {
-						throw new UniversalApiError(`POST request with file and body is not allowed in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
-					}
-					let writeFile: any = -1;
+					let shouldWrite = false;
 					if (fileFound) {
 						if (!IS_JSON_FILE) {
 							throw new UniversalApiError(`POST request for not json file is not allowed in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 						}
-						result.status = Constants.HTTP_STATUS_CODE.OK;
 						if (HAS_PAG_OR_FILT) {
 							try {
 								logger.debug("handlingApiFsRequest: applying pagination and filters");
 								Utils.request.applyPaginationAndFilters(request, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin, dataFile);
 							} catch (error: any) {
 								if (error instanceof UniversalApiError) {
-									if (error.getType() === "MANUALLY_HANDLED") {
-										error.setType("ERROR");
-										error.setPath(fullUrl.pathname);
-									}
+									if (!error.getPath()) error.setPath(fullUrl.pathname);
 									throw error;
 								}
 								logger.debug("handlingApiFsRequest: ERROR parsing json content file", file!, error);
 								throw new UniversalApiError(`Error retrieving filtered and paginated data from ${file}`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 							}
-						}
-						if (HAS_DATA) {
-							if (!IS_JSON_CONTENT || !HAS_PAG_OR_FILT) {
-								throw new UniversalApiError(`File at ${fullUrl.pathname} already exists`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.CONFLICT);
+							if (HAS_DATA) {
+								if (!IS_JSON_CONTENT) {
+									throw new UniversalApiError(`File at ${fullUrl.pathname} already exists`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.CONFLICT);
+								}
+								const bodyClean = Utils.request.getCleanBody(request.method, currentContent, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin);
+								if (bodyClean !== null) {
+									throw new UniversalApiError(`File at ${fullUrl.pathname} already exists`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.CONFLICT);
+								}
 							}
-							const bodyClean = Utils.request.getCleanBody(request.method, currentContent, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin);
-							if (bodyClean !== null) {
-								throw new UniversalApiError(`File at ${fullUrl.pathname} already exists`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.CONFLICT);
+
+							const wasArray = Array.isArray(dataFile.originalData);
+							if (!wasArray && dataFile.data === null) {
+								throw new UniversalApiError("Not found", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.NOT_FOUND);
 							}
+
+							const responseData = wasArray ? (dataFile.data ?? []) : dataFile.data;
+							dataFile.total = wasArray
+								? (Array.isArray(dataFile.data) ? dataFile.data.length : 0)
+								: dataFile.data ? 1 : 0;
+
+							result.status = Constants.HTTP_STATUS_CODE.OK;
+							result.data = responseData;
+							result.headers.push(
+								{ name: "content-type", value: dataFile.mimeType },
+								{ name: "content-length", value: Utils.files.getByteLength(responseData) },
+								{ name: Constants.TOTAL_ELEMENTS_HEADER, value: dataFile.total }
+							);
+						} else {
+							throw new UniversalApiError(`File at ${fullUrl.pathname} already exists`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.CONFLICT);
 						}
-						result.data = dataFile.data;
-						dataFile.total = Array.isArray(dataFile.data)
-							? dataFile.data.length
-							: dataFile.data
-								? 1
-								: 0;
-						result.headers.push(
-							{ name: "content-type", value: dataFile.mimeType },
-							{ name: "content-length", value: Utils.files.getByteLength(dataFile.data) },
-							{ name: Constants.TOTAL_ELEMENTS_HEADER, value: dataFile.total }
-						);
 					} else {
 						if (!HAS_DATA) {
 							throw new UniversalApiError(`No data provided`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
@@ -310,11 +394,12 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 							throw new UniversalApiError(`No data to filter or to paginate`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 						}
 						result.status = Constants.HTTP_STATUS_CODE.CREATED;
-						writeFile = currentContent;
+						shouldWrite = true;
 					}
-					if (writeFile !== -1) {
+
+					if (shouldWrite) {
 						try {
-							await Utils.files.writingFile(file, fileFound, writeFile, currentMime, true);
+							await Utils.files.writingFile(file, fileFound, currentContent, currentMime, true);
 						} catch (error: any) {
 							logger.error("handlingApiFsRequest: Error writing file with POST method", error);
 							throw new UniversalApiError("Error writing data", "ERROR", fullUrl.pathname);
@@ -328,7 +413,8 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 					throw new UniversalApiError("Error creating data", "ERROR", fullUrl.pathname);
 				}
 				break;
-			case "PUT":
+			}
+			case "PUT": {
 				if (!IS_API_REST_FS) {
 					logger.debug("handlingApiFsRequest: parsing request");
 					await Utils.request.parseRequest(request, res, fullUrl, parser, logger);
@@ -336,27 +422,41 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 				if (request.files !== null && request.files.length > 1) {
 					throw new UniversalApiError(`PUT request with multiple file is not allowed in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 				}
-				result.status = Constants.HTTP_STATUS_CODE[fileFound ? "OK" : "CREATED"];
-				let writeFile, mimeType;
+
+				let writeContent: any;
+				let mimeType: MimeType;
+
 				if (request.body !== null) {
-					writeFile = request.body
+					if (typeof request.body === "string" && request.body.trim().length === 0) {
+						throw new UniversalApiError("No data provided", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
+					}
+					writeContent = request.body;
 					mimeType = Utils.request.isBodyJson(request.body)
 						? MimeType[".json"]
 						: request.headers["content-type"] as MimeType;
 				} else if (request.files !== null && request.files.length > 0) {
-					writeFile = request.files[0].content;
+					writeContent = request.files[0].content;
 					mimeType = request.files[0].contentType as MimeType;
 				} else {
 					throw new UniversalApiError("No data provided", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 				}
+
+				if (fileFound) {
+					result.status = Constants.HTTP_STATUS_CODE.OK;
+				} else {
+					result.status = Constants.HTTP_STATUS_CODE.CREATED;
+					result.headers.push({ name: "Location", value: fullUrl.pathname });
+				}
+
 				try {
-					await Utils.files.writingFile(file, fileFound, writeFile, mimeType as MimeType, true);
+					await Utils.files.writingFile(file, fileFound, writeContent, mimeType, true);
 				} catch (error: any) {
 					logger.error(`handlingApiFsRequest: Error ${fileFound ? "updating" : "creating"} file with PUT method`, error);
 					throw new UniversalApiError(`Error ${fileFound ? "updating" : "creating"} data`, "ERROR", fullUrl.pathname);
 				}
 				break;
-			case "PATCH":
+			}
+			case "PATCH": {
 				if (!["application/json", "application/json-patch+json", "application/merge-patch+json"].includes(request.headers["content-type"] || "")) {
 					throw new UniversalApiError(`PATCH request content-type unsupported in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.UNSUPPORTED_MEDIA_TYPE);
 				}
@@ -370,15 +470,22 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 				if (dataFile.mimeType !== MimeType[".json"]) {
 					throw new UniversalApiError(`Only json file can be processing with PATCH http method`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 				}
-				result.status = Constants.HTTP_STATUS_CODE.OK;
+				if (request.body === null) {
+					throw new UniversalApiError("No patch body provided", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.UNPROCESSABLE_ENTITY);
+				}
 				try {
 					const TYPE_PATCH = ["application/json", "application/merge-patch+json"].includes(request.headers["content-type"]!) ? "merge" : "json";
 					const newData = Utils.files.applyingPatch(JSON.parse(dataFile.data), request.body, TYPE_PATCH);
 					await Utils.files.writingFile(file, fileFound, newData, dataFile.mimeType, true);
+					result.status = Constants.HTTP_STATUS_CODE.OK;
+					result.data = newData;
+					result.headers.push(
+						{ name: "content-type", value: dataFile.mimeType },
+						{ name: "content-length", value: Utils.files.getByteLength(newData) }
+					);
 				} catch (error: any) {
 					if (error instanceof UniversalApiError) {
-						if (error.getType() === "MANUALLY_HANDLED") {
-							error.setType("ERROR");
+						if (!error.getPath()) {
 							error.setPath(fullUrl.pathname);
 						}
 						throw error;
@@ -387,9 +494,10 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 					throw new UniversalApiError("Error partial updating resource", "ERROR", fullUrl.pathname);
 				}
 				break;
+			}
 			case "OPTIONS":
 				throw new UniversalApiError(`Method OPTIONS not allowed in File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.METHOD_NOT_ALLOWED);
-			case "DELETE":
+			case "DELETE": {
 				if (!fileFound) {
 					throw new UniversalApiError("Resource to delete not found", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.NOT_FOUND);
 				}
@@ -400,20 +508,18 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 				if (request.body !== null || request.files !== null) {
 					throw new UniversalApiError(`DELETE request cannot have a body in ${IS_API_REST_FS ? "REST " : ""}File System API mode`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 				}
-				result.status = Constants.HTTP_STATUS_CODE.NO_CONTENT;
 				try {
 					let removeFile = true;
 					if (dataFile.mimeType === MimeType[".json"] && Utils.request.hasPaginationOrFilters(request.method, paginationPlugin, filtersPlugin, paginationHandler, filtersHandler)) {
 						try {
 							logger.debug("handlingApiFsRequest: applying pagination and filters");
 							Utils.request.applyPaginationAndFilters(request, paginationHandler, filtersHandler, paginationPlugin, filtersPlugin, dataFile);
-							if (!dataFile.data || Array.isArray(dataFile.data) && dataFile.data.length === 0) {
+							if (!dataFile.data || (Array.isArray(dataFile.data) && dataFile.data.length === 0)) {
 								throw new UniversalApiError("Partial resource to delete not found", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.NOT_FOUND);
 							}
 						} catch (error: any) {
 							if (error instanceof UniversalApiError) {
-								if (error.getType() === "MANUALLY_HANDLED") {
-									error.setType("ERROR");
+								if (!error.getPath()) {
 									error.setPath(fullUrl.pathname);
 								}
 								throw error;
@@ -421,6 +527,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 							logger.debug("handlingApiFsRequest: ERROR parsing json content file ", file!, error);
 							throw new UniversalApiError(`Error parsing json content file ${file}`, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.BAD_REQUEST);
 						}
+
 						let newData: any[] | Record<string, any>;
 						if (Array.isArray(dataFile.originalData)) {
 							const toDeleteStrings = new Set((dataFile.data as Array<any>).map(el => JSON.stringify(el)));
@@ -428,21 +535,27 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 						} else {
 							newData = structuredClone(dataFile.originalData);
 							Object.keys(dataFile.data).forEach(key => {
-								JSON.stringify(dataFile.originalData[key]) === JSON.stringify(dataFile.data[key]) && delete (newData as Record<string, any>)[key];
-							})
+								if (JSON.stringify(dataFile.originalData[key]) === JSON.stringify(dataFile.data[key])) {
+									delete (newData as Record<string, any>)[key];
+								}
+							});
 						}
-						// INFO partial delete allowed allowed in json file with array
+
 						if (Array.isArray(newData) && newData.length > 0) {
 							removeFile = false;
 							await Utils.files.writingFile(file, fileFound, newData, MimeType[".json"], true);
+							result.status = Constants.HTTP_STATUS_CODE.NO_CONTENT;
 							result.headers.push({
 								name: Constants.DELETED_ELEMENTS_HEADER,
-								value: dataFile.originalData.length - newData.length
+								value: (dataFile.originalData as any[]).length - newData.length
 							});
+						} else if (!Array.isArray(newData) && Object.keys(newData).length > 0) {
+							// INFO DELETE request on a single object always deletes the entire resource.
 						}
 					}
 					if (removeFile) {
 						await Utils.files.removeFile(file);
+						result.status = Constants.HTTP_STATUS_CODE.NO_CONTENT;
 						result.headers.push({ name: Constants.DELETED_ELEMENTS_HEADER, value: 1 });
 					}
 				} catch (error) {
@@ -452,6 +565,7 @@ async function handlingApiFsRequest(logger: ILogger, fullUrl: URL, request: Univ
 					throw new UniversalApiError("Error deleting resource", "ERROR", fullUrl.pathname);
 				}
 				break;
+			}
 			default:
 				return false;
 		}
@@ -491,20 +605,20 @@ async function handlingApiRestRequest(logger: ILogger, matcher: AntPathMatcher, 
 		}
 		if (handler !== null) {
 			logger.debug("handlingApiRestRequest: using REST api");
-			logger.info("Request handling with REST API: handler matched= ", handler.pattern);
+			logger.debug("Request handling with REST API: handler matched= ", handler.pattern);
 
 			if (handler.authenticate) {
 				try {
 					const allowed = await checkAuthenticate(handler.authenticate, request);
 					if (!allowed) {
 						logger.debug("handlingApiRestRequest: authenticate rejected " + fullUrl.pathname);
-						throw new UniversalApiError("Unauthorized", "ERROR", fullUrl.pathname, 401);
+						throw new UniversalApiError("Unauthorized", "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.UNAUTHORIZED);
 					}
 				} catch (err: any) {
 					if (err instanceof UniversalApiError) {
 						throw err;
 					}
-					throw new UniversalApiError(err as Error, "ERROR", fullUrl.pathname, 500);
+					throw new UniversalApiError(err as Error, "ERROR", fullUrl.pathname, Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR);
 				}
 			}
 
@@ -551,7 +665,7 @@ async function handlingApiRestRequest(logger: ILogger, matcher: AntPathMatcher, 
 }
 
 const runPluginInternal = async (req: IncomingMessage, res: ServerResponse, logger: ILogger, options: UniversalApiOptionsRequired) => {
-	const { config, endpointPrefix, handlers, matcher, middlewares, errorMiddlewares, delay, fullFsDir, filters, pagination, parser } = options;
+	const { config, disablePureFsApi, endpointPrefix, handlers, matcher, middlewares, errorMiddlewares, delay, fullFsDir, filters, pagination, parser } = options;
 	const fullUrl = Utils.request.buildFullUrl(req, config);
 	const endpointNoPrefix = Utils.request.removeEndpointPrefix(fullUrl.pathname, endpointPrefix);
 	let requ: UniversalApiRequest<any> = req as UniversalApiRequest<any>;
@@ -565,7 +679,7 @@ const runPluginInternal = async (req: IncomingMessage, res: ServerResponse, logg
 		}
 
 		if (!Utils.request.matchesEndpointPrefix(req.url, endpointPrefix)) {
-			logger.info(`runPluginInternal: Request with url ${req.url} doesn't match endpointPrefix option.`);
+			logger.debug(`runPluginInternal: Request with url ${req.url} doesn't match endpointPrefix option.`);
 			throw new UniversalApiError("Request doesn't match endpointPrefix", "NO_HANDLER", fullUrl.pathname);
 		}
 		const request = Utils.request.createRequest(req);
@@ -578,9 +692,11 @@ const runPluginInternal = async (req: IncomingMessage, res: ServerResponse, logg
 			return result;
 		}
 
-		handled = await handlingApiFsRequest(logger, fullUrl, request, res, pagination, filters, parser, null, endpointPrefix, fullFsDir, result);
-		if (handled) {
-			return result;
+		if (!disablePureFsApi) {
+			handled = await handlingApiFsRequest(logger, fullUrl, request, res, pagination, filters, parser, null, endpointPrefix, fullFsDir, result);
+			if (handled) {
+				return result;
+			}
 		}
 
 		throw new UniversalApiError(`Impossible handling request with url ${fullUrl}`, "NO_HANDLER", fullUrl.pathname);
@@ -600,11 +716,28 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 	try {
 		const { gatewayTimeout, errorMiddlewares, noHandledRestFsRequestsAction: noHandledRequestsAction } = options;
 		const { promise, reject, resolve } = Utils.plugin.promiseWithResolver<ApiWsRestFsDataResponse>();
-		let gatewayIdTimeout: NodeJS.Timeout;
+
+		let settled = false;
+		let gatewayIdTimeout: NodeJS.Timeout | undefined;
+
+		const settleResolve = (value: ApiWsRestFsDataResponse) => {
+			if (settled) {
+				return;
+			}
+			settled = true;
+			clearTimeout(gatewayIdTimeout);
+			resolve(value);
+		};
+
+		const settleReject = (reason: unknown) => {
+			settled = true;
+			clearTimeout(gatewayIdTimeout);
+			reject(reason);
+		};
 
 		if (gatewayTimeout !== 0) {
 			gatewayIdTimeout = setTimeout(() => {
-				resolve({
+				settleResolve({
 					status: Constants.HTTP_STATUS_CODE.GATEWAY_TIMEOUT,
 					readFile: false,
 					isError: true,
@@ -618,18 +751,17 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 
 		runPluginInternal(req, response, logger, options)
 			.then(result => {
-				clearTimeout(gatewayIdTimeout);
 				const { status, data, headers } = result;
-				resolve({
+				settleResolve({
 					status: status!,
 					data,
 					readFile: false,
 					isError: false,
-					headers
+					headers,
+					req
 				});
 			})
-			.catch(async (error: UniversalApiError) => {
-				clearTimeout(gatewayIdTimeout);
+			.catch((error: UniversalApiError) => {
 				const dataResponse: ApiWsRestFsDataResponse = {
 					status: Constants.HTTP_STATUS_CODE.INTERNAL_SERVER_ERROR,
 					data: error.message,
@@ -644,7 +776,7 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 				switch (error.getType()) {
 					case "NO_HANDLER":
 						if (noHandledRequestsAction === "forward") {
-							reject("next");
+							settleReject("next");
 							callReject = true;
 						} else {
 							dataResponse.status = Constants.HTTP_STATUS_CODE.NOT_FOUND;
@@ -652,7 +784,12 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 						}
 						break;
 					case "MANUALLY_HANDLED":
-						dataResponse.data = `${error.message} Handled request did not send any response`;
+						if (!response.writableEnded) {
+							dataResponse.data = "FS REST Handled request did not send any response";
+						} else {
+							settleReject("MANUALLY_HANDLED");
+							callReject = true;
+						}
 						break;
 					case "ERROR":
 						dataResponse.status = error.getCode();
@@ -676,7 +813,7 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 						dataResponse.data = dataResponse.data ?? "Internal Server Error";
 						break;
 				}
-				!callReject && resolve(dataResponse);
+				!callReject && settleResolve(dataResponse);
 			});
 
 		logger.debug(`runPlugin: awaiting runInternalPlugin execution`);
@@ -686,6 +823,8 @@ export const runPlugin = async (req: IncomingMessage, response: ServerResponse, 
 		logger.debug(`runPlugin: runInternalPlugin error`);
 		if (error === "next") {
 			next();
+		} else if (error === "MANUALLY_HANDLED") {
+			// INFO already handled
 		} else {
 			next(error);
 		}
@@ -744,18 +883,21 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 		const endpointNoPrefix = Utils.request.removeEndpointPrefix(url.pathname, options.endpointPrefix);
 
 		let handler: typeof wsHandlers[number] | null = null;
+		let wsParams: Record<string, string> | null = null;
 		for (const handle of wsHandlers) {
+			const candidateParams: Record<string, string> = {};
 			const matched = options.matcher.doMatch(
 				Utils.request.addSlash(handle.pattern, "leading"),
 				Utils.request.addSlash(endpointNoPrefix, "leading"),
 				true,
-				null
+				candidateParams
 			);
 			if (matched) {
 				if (handle.disabled) {
 					logger.debug("runWsPlugin: matched handler is disabled");
 				} else {
 					handler = handle;
+					wsParams = Object.keys(candidateParams).length > 0 ? candidateParams : null;
 					break;
 				}
 			}
@@ -763,7 +905,11 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 
 		if (handler === null) {
 			logger.debug(`runWsPlugin: no handler for ${url.pathname}`);
-			socket.end("HTTP/1.1 404 Not Found\r\n\r\n");
+			const matchesOurPrefix = Utils.request.matchesEndpointPrefix(req.url, options.endpointPrefix);
+			if (matchesOurPrefix) {
+				logger.debug(`runWsPlugin: path matches prefix but no WS handler registered — rejecting`);
+				socket.end("HTTP/1.1 404 Not Found\r\n\r\n");
+			}
 			return;
 		}
 
@@ -790,6 +936,7 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 
 		handlerWss.handleUpgrade(req, socket as any, head, async (ws) => {
 			logger.debug(`runWsPlugin: connection upgraded for ${url.pathname}`);
+			(req as any).params = wsParams;
 			const connection = new WebSocketConnection(
 				logger,
 				ws,
@@ -830,7 +977,9 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 			});
 
 			ws.on("ping", async (data: Buffer) => {
-				connection.resetMissedPong();
+				if (currentHandler.inactivityTimeout && currentHandler.inactivityTimeout > 0) {
+					connection.resetInactivityTimer(currentHandler.inactivityTimeout);
+				}
 				if (currentHandler.onPing) {
 					try {
 						await currentHandler.onPing(connection, data);
@@ -885,8 +1034,9 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 					}
 				}
 
-				if (currentHandler.delay && currentHandler.delay > 0) {
-					await new Promise(res => setTimeout(res, currentHandler.delay));
+				const effectiveDelay = currentHandler.delay ?? options.delay;
+				if (effectiveDelay && effectiveDelay > 0) {
+					await new Promise(res => setTimeout(res, effectiveDelay));
 				}
 
 				let matched = false;
@@ -950,19 +1100,28 @@ export const runWsPlugin = (server: ViteDevServer | PreviewServer, logger: ILogg
 			});
 
 			ws.on("close", async (code: number, reason: Buffer) => {
-				if (!connection.closed) {
+				const wasAlreadyClosed = connection.closed;
+				if (!wasAlreadyClosed) {
 					connection.markClosed();
-					if (currentHandler.onClose) {
-						await currentHandler.onClose(connection, code, reason.toString() || "", true);
-					}
-					manager.remove(connection.id);
 				}
+				if (currentHandler.onClose) {
+					try {
+						await currentHandler.onClose(connection, code, reason.toString() || "", !wasAlreadyClosed);
+					} catch (err: any) {
+						logger.error(`runWsPlugin: error in onClose handler for ${connection.id}: `, err);
+					}
+				}
+				manager.remove(connection.id);
 			});
 
 			ws.on("error", async (err: Error) => {
 				logger.debug(`runWsPlugin: socket error for ${connection.id}: `, err.message);
 				if (currentHandler.onError) {
-					await currentHandler.onError(connection, err);
+					try {
+						await currentHandler.onError(connection, err);
+					} catch (handlerErr: any) {
+						logger.error(`runWsPlugin: error in onError handler for ${connection.id}: `, handlerErr?.message ?? String(handlerErr));
+					}
 				} else {
 					logger.error(`runWsPlugin: socket error for ${connection.id}: `, err.message);
 				}
