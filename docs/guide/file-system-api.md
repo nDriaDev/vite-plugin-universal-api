@@ -352,6 +352,35 @@ const users = Array.from({ length: 100 }, (_, i) => ({
 // Save to mock/users.json
 ```
 
+## Disabling the Pure File-System API
+
+By default, any request that reaches the plugin and does not match a REST handler is automatically resolved against `fsDir` (the pure File-System API). You can turn off this automatic fallback with the `disablePureFsApi` option.
+
+```typescript
+universalApi({
+  fsDir: 'mock',
+  disablePureFsApi: true, // disable the automatic FS fallback
+  handlers: [
+    { pattern: '/api/users', method: 'GET', handle: 'FS' }
+  ]
+})
+```
+
+When `disablePureFsApi` is `true`:
+
+- Requests that match a handler with `handle: "FS"` are **still served from `fsDir`** as usual.
+- Requests that do **not** match any handler are handled according to `noHandledRestFsRequestsAction` (`"404"` by default) — they are **never** automatically mapped to files.
+
+| Request | `disablePureFsApi: false` (default) | `disablePureFsApi: true` |
+|---------|--------------------------------------|--------------------------|
+| Matches a handler with `handle: "FS"` | Served from `fsDir` ✓ | Served from `fsDir` ✓ |
+| Matches a custom handler | Custom logic ✓ | Custom logic ✓ |
+| No handler matched | Automatic FS lookup ✓ | 404 / forward ✓ |
+
+::: tip When to use this option
+Use `disablePureFsApi: true` when you want strict, explicit control over which endpoints are exposed and you want to prevent the plugin from automatically serving any file that happens to exist under `fsDir`.
+:::
+
 ## Limitations
 
 - ❌ POST with multiple files not supported (only first file is written)
