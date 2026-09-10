@@ -1,5 +1,17 @@
 ### [1.0.4](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v1.0.4) - 2026-02-09
 
+## [2.3.1](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v2.3.1) - 2026-09-10
+
+### Chores
+
+- update dependencies ([d271dc1](https://github.com/nDriaDev/vite-plugin-universal-api/commit/d271dc1))
+- add explicit typescript version ([a91fe74](https://github.com/nDriaDev/vite-plugin-universal-api/commit/a91fe74))
+- update dependencies ([0ca5143](https://github.com/nDriaDev/vite-plugin-universal-api/commit/0ca5143))
+- fix endofline character ([0129cac](https://github.com/nDriaDev/vite-plugin-universal-api/commit/0129cac))
+- fix workflows + release script ([759a5af](https://github.com/nDriaDev/vite-plugin-universal-api/commit/759a5af))
+- update release script CI mode ([94d31ea](https://github.com/nDriaDev/vite-plugin-universal-api/commit/94d31ea))
+- update autofix workflow ([1db87b4](https://github.com/nDriaDev/vite-plugin-universal-api/commit/1db87b4))
+
 ## [2.3.0](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v2.3.0) - 2026-06-12
 
 ### Bug Fixes
