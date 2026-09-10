@@ -1,5 +1,3 @@
-### [1.0.4](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v1.0.4) - 2026-02-09
-
 ## [2.3.1](https://github.com/nDriaDev/vite-plugin-universal-api/releases/tag/v2.3.1) - 2026-09-10
 
 ### Chores
